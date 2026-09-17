@@ -11,6 +11,10 @@ public struct ProjectInputView: View {
     @State private var projectDescription: String = ""
     @State private var startDate: Date = Date()
 
+    // Servicio nativo de audio y transcripción
+    @State private var transcriptionService = AudioTranscriptionService()
+    @State private var baseDescriptionBeforeRecording: String = ""
+
     public init(viewModel: ProjectViewModel) {
         self.viewModel = viewModel
     }
@@ -45,8 +49,8 @@ public struct ProjectInputView: View {
                         .datePickerStyle(.compact)
                     }
 
-                    // Descripción del Proyecto en Lenguaje Natural
-                    VStack(alignment: .leading, spacing: 6) {
+                    // Cabecera de Descripción con Controles de Dictado
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(String(localized: "Descripción en Lenguaje Natural"))
                                 .font(.subheadline)
@@ -59,6 +63,85 @@ public struct ProjectInputView: View {
                                 .foregroundStyle(projectDescription.count > 1500 ? .orange : .secondary)
                         }
 
+                        // Barra de herramientas de grabación y transcripción
+                        HStack(spacing: 12) {
+                            // Selector de idioma nativo de Apple
+                            HStack(spacing: 4) {
+                                Image(systemName: "globe")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                Picker("", selection: $transcriptionService.selectedLocaleOption) {
+                                    ForEach(transcriptionService.availableLocales) { opt in
+                                        Text(opt.displayName).tag(opt)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .disabled(transcriptionService.isRecording)
+                                .frame(maxWidth: 220)
+                            }
+
+                            Spacer()
+
+                            // Botón de grabación / micrófono
+                            Button(action: toggleRecording) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: transcriptionService.isRecording ? "stop.circle.fill" : "mic.fill")
+                                        .foregroundStyle(transcriptionService.isRecording ? .red : .primary)
+                                        .symbolEffect(.pulse, isActive: transcriptionService.isRecording)
+
+                                    if transcriptionService.isRecording {
+                                        Text(transcriptionService.formattedDuration)
+                                            .font(.caption.monospacedDigit())
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(.red)
+
+                                        Text(String(localized: "Detener"))
+                                            .font(.caption)
+                                    } else {
+                                        Text(String(localized: "Dictar con Voz"))
+                                            .font(.caption)
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(transcriptionService.isRecording ? .red : .blue)
+                            .help(String(localized: "voice_input_tooltip"))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        // Banner de estado de grabación
+                        if transcriptionService.isRecording {
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 8, height: 8)
+                                    .opacity(0.8)
+
+                                Text(String(localized: "listening"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 4)
+                            .transition(.opacity)
+                        }
+
+                        // Error de transcripción o micrófono
+                        if let error = transcriptionService.errorMessage {
+                            Text(error)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 4)
+                        }
+
+                        // Editor de texto
                         TextEditor(text: $projectDescription)
                             .frame(minHeight: 120)
                             .padding(6)
@@ -69,7 +152,7 @@ public struct ProjectInputView: View {
                                     .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                             )
 
-                        Text(String(localized: "Describe objetivos, requerimientos o fases clave. Apple Intelligence descompondrá esto en tareas estimadas."))
+                        Text(String(localized: "Describe objetivos, requerimientos o fases clave. Puedes escribir o dictar por voz."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -79,6 +162,11 @@ public struct ProjectInputView: View {
                     // Botones de acción
                     VStack(spacing: 10) {
                         Button(action: {
+                            // Detener grabación si está en curso antes de analizar
+                            if transcriptionService.isRecording {
+                                transcriptionService.stopRecording()
+                            }
+
                             Task {
                                 await viewModel.createProjectWithAI(
                                     name: projectName,
@@ -107,6 +195,10 @@ public struct ProjectInputView: View {
                         .disabled(projectDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isDecomposing)
 
                         Button(action: {
+                            if transcriptionService.isRecording {
+                                transcriptionService.stopRecording()
+                            }
+
                             viewModel.createManualProject(
                                 name: projectName,
                                 description: projectDescription,
@@ -127,12 +219,15 @@ public struct ProjectInputView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "Cancelar")) {
+                        if transcriptionService.isRecording {
+                            transcriptionService.stopRecording()
+                        }
                         dismiss()
                     }
                     .disabled(viewModel.isDecomposing)
                 }
             }
-            .frame(minWidth: 500, minHeight: 460)
+            .frame(minWidth: 520, minHeight: 520)
             .alert(
                 String(localized: "Error al generar plan"),
                 isPresented: Binding(
@@ -143,6 +238,28 @@ public struct ProjectInputView: View {
                 Button(String(localized: "Aceptar"), role: .cancel) {}
             } message: {
                 Text(viewModel.errorMessage ?? String(localized: "Ocurrió un error inesperado."))
+            }
+            .onDisappear {
+                if transcriptionService.isRecording {
+                    transcriptionService.stopRecording()
+                }
+            }
+        }
+    }
+
+    private func toggleRecording() {
+        if transcriptionService.isRecording {
+            transcriptionService.stopRecording()
+        } else {
+            baseDescriptionBeforeRecording = projectDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            Task {
+                await transcriptionService.startRecording { recognizedText in
+                    if baseDescriptionBeforeRecording.isEmpty {
+                        self.projectDescription = recognizedText
+                    } else {
+                        self.projectDescription = "\(baseDescriptionBeforeRecording)\n\(recognizedText)"
+                    }
+                }
             }
         }
     }

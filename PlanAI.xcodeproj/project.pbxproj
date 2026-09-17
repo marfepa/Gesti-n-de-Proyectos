@@ -17,6 +17,7 @@
 		709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */; };
 		813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5487C1BEB5E269B777A4877A /* ProjectInputView.swift */; };
 		8274EFE9C9AF24D3F6D0CC27 /* GenerablePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */; };
+		AB8EA9FC2ED362CB959C7854 /* AudioTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D95202D689690C6C712033E /* AudioTranscriptionService.swift */; };
 		B79EF63F8A19517E9ADD6BE2 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = C6151A7E6B60A91DC3BEFCF5 /* Localizable.strings */; };
 		E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */; };
 		EFC64112F1F8FB63D8177C7C /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5CDFD9DAE28D9627B7F0CE /* Project.swift */; };
@@ -37,6 +38,7 @@
 
 /* Begin PBXFileReference section */
 		0D76D706E21F9E719783DC87 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		0D95202D689690C6C712033E /* AudioTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTranscriptionService.swift; sourceTree = "<group>"; };
 		0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViewModel.swift; sourceTree = "<group>"; };
 		198099C7483DDD050D604FDF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditSheet.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 			isa = PBXGroup;
 			children = (
 				93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */,
+				0D95202D689690C6C712033E /* AudioTranscriptionService.swift */,
 				70C2E3C9D42B542CA513B7B9 /* TaskDecompositionService.swift */,
 			);
 			path = Services;
@@ -269,6 +272,7 @@
 			files = (
 				10C530669D3B5FA63ED705C2 /* AIAvailabilityService.swift in Sources */,
 				166C1A4ADC40B18943DBD8E6 /* AIStatusBanner.swift in Sources */,
+				AB8EA9FC2ED362CB959C7854 /* AudioTranscriptionService.swift in Sources */,
 				312650D1DCD7ACB6AF5D95F5 /* ContentView.swift in Sources */,
 				0A0712FC7CAF2BF6CEB58D8C /* GanttChartView.swift in Sources */,
 				8274EFE9C9AF24D3F6D0CC27 /* GenerablePlan.swift in Sources */,

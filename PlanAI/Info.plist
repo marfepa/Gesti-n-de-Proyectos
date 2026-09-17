@@ -22,5 +22,9 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026. Todos los derechos reservados.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>PlanAI necesita acceso al micrófono para grabar la descripción de tu proyecto mediante voz.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>PlanAI utiliza el reconocimiento de voz de Apple para transcribir tu explicación a texto directamente en el dispositivo.</string>
 </dict>
 </plist>

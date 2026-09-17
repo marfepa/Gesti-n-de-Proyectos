@@ -12,7 +12,12 @@ Permite transformar descripciones de proyectos en lenguaje natural en un cronogr
    - Utiliza `LanguageModelSession` de `FoundationModels`.
    - **Guided Generation** mediante macros `@Generable` y `@Guide`: el modelo devuelve de forma determinista la estructura tipada `TaskPlan` / `SubtaskPlan` sin fragilidad de formato ni riesgo de fallo en el parseo JSON.
 
-2. **Cálculo Determinista de Fechas**
+2. **Grabación de Voz y Transcripción Nativa (Apple Speech & AVFoundation)**
+   - Dictado en directo con `SFSpeechRecognizer` y `AVAudioEngine`.
+   - Selector dinámico de idioma con soporte on-device (Español de España, México, EE.UU., Inglés US/UK, etc.).
+   - Visualización de tiempo de grabación y volcado en tiempo real en la descripción del proyecto.
+
+3. **Cálculo Determinista de Fechas**
    - El modelo de lenguaje estima las duraciones relativas y el orden secuencial lógico.
    - Swift y `Calendar.current` calculan las fechas exactas de inicio y fin de cada fase evitando solapamientos y gestionando días laborables.
 

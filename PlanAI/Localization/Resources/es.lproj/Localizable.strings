@@ -40,3 +40,11 @@
 "days_short" = "%d d";
 "character_count" = "%d / 2000 caracteres";
 "warning_long_text" = "Recomendamos menos de 1500 caracteres para no saturar la ventana de contexto.";
+
+/* Transcripción de Audio y Voz */
+"dictate_project" = "Dictar con Voz";
+"recording" = "Grabando...";
+"stop_recording" = "Detener Grabación";
+"transcription_language" = "Idioma del dictado:";
+"listening" = "Escuchando... habla de tu proyecto";
+"voice_input_tooltip" = "Grabar audio y transcribir automáticamente a texto";

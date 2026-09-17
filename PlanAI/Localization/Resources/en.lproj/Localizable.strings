@@ -40,3 +40,11 @@
 "days_short" = "%d d";
 "character_count" = "%d / 2000 characters";
 "warning_long_text" = "We recommend under 1500 characters to fit model context window.";
+
+/* Audio & Voice Transcription */
+"dictate_project" = "Dictate with Voice";
+"recording" = "Recording...";
+"stop_recording" = "Stop Recording";
+"transcription_language" = "Dictation language:";
+"listening" = "Listening... explain your project";
+"voice_input_tooltip" = "Record audio and automatically transcribe to text";

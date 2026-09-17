@@ -33,6 +33,8 @@ targets:
       - framework: SwiftUI.framework
       - framework: SwiftData.framework
       - framework: Charts.framework
+      - framework: AVFoundation.framework
+      - framework: Speech.framework
       - framework: FoundationModels.framework
         optional: true
 
