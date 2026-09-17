@@ -154,42 +154,27 @@ public struct GanttChartView: View {
             } else {
                 let scale = timeScale
                 let items = chartItems
-                let contentWidth = max(700, CGFloat(scale.totalDays * 32))
+                let timelineTrailingPadding: CGFloat = 80
+                let contentWidth = max(700, CGFloat(scale.totalDays * 32)) + timelineTrailingPadding
 
-                ScrollView([.horizontal, .vertical]) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        // Regla temporal superior (Ticks semanales / fechas)
-                        HStack(spacing: 0) {
-                            Text(String(localized: "Fases / Tareas"))
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.secondary)
-                                .frame(width: leftColumnWidth, alignment: .leading)
-                                .padding(.leading, 12)
-
-                            ZStack(alignment: .bottomLeading) {
-                                ForEach(scale.ticks, id: \.self) { tick in
-                                    let x = scale.xPosition(for: tick, totalWidth: contentWidth)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(formatDate(tick))
-                                            .font(.system(size: 9, weight: .semibold))
-                                            .foregroundStyle(.secondary)
-                                        Rectangle()
-                                            .fill(Color.gray.opacity(0.3))
-                                            .frame(width: 1, height: 8)
-                                    }
-                                    .offset(x: x)
-                                }
+                ScrollView(.vertical) {
+                    HStack(alignment: .top, spacing: 0) {
+                        // Columna izquierda fija (Títulos y duraciones)
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Cabecera columna fija
+                            HStack {
+                                Text(String(localized: "Fases / Tareas"))
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.secondary)
                             }
-                            .frame(width: contentWidth, height: 32)
-                        }
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .overlay(Divider(), alignment: .bottom)
+                            .frame(width: leftColumnWidth, height: 32, alignment: .leading)
+                            .padding(.leading, 12)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .overlay(Divider(), alignment: .bottom)
 
-                        // Filas de tareas
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            HStack(spacing: 0) {
-                                // Columna izquierda: Título y duración
+                            // Filas columna fija
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                 HStack {
                                     Text(item.title)
                                         .font(.system(size: item.isSubtask ? 11 : 12, weight: item.isSubtask ? .regular : .semibold))
@@ -208,40 +193,67 @@ public struct GanttChartView: View {
                                 .frame(width: leftColumnWidth, height: rowHeight, alignment: .leading)
                                 .padding(.leading, 12)
                                 .background(index % 2 == 0 ? Color.clear : Color(nsColor: .separatorColor).opacity(0.04))
-                                .overlay(
-                                    Rectangle()
-                                        .frame(width: 1)
-                                        .foregroundStyle(Color.gray.opacity(0.15)),
-                                    alignment: .trailing
-                                )
+                                .overlay(Divider().opacity(0.4), alignment: .bottom)
+                            }
+                        }
+                        .overlay(
+                            Rectangle()
+                                .frame(width: 1)
+                                .foregroundStyle(Color.gray.opacity(0.15)),
+                            alignment: .trailing
+                        )
 
-                                // Área de trazado de barras
-                                ZStack(alignment: .leading) {
-                                    // Líneas verticales de rejilla
+                        // Área de cronograma desplazable horizontalmente
+                        ScrollView(.horizontal) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                // Regla temporal superior (Ticks semanales / fechas)
+                                ZStack(alignment: .bottomLeading) {
                                     ForEach(scale.ticks, id: \.self) { tick in
                                         let x = scale.xPosition(for: tick, totalWidth: contentWidth)
-                                        Rectangle()
-                                            .fill(Color.gray.opacity(0.12))
-                                            .frame(width: 1)
-                                            .offset(x: x)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(formatDate(tick))
+                                                .font(.system(size: 9, weight: .semibold))
+                                                .foregroundStyle(.secondary)
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.3))
+                                                .frame(width: 1, height: 8)
+                                        }
+                                        .offset(x: x)
                                     }
-
-                                    // Línea indicadora de Hoy
-                                    if scale.isTodayVisible {
-                                        let todayX = scale.xPosition(for: scale.today, totalWidth: contentWidth)
-                                        Rectangle()
-                                            .fill(Color.red.opacity(0.6))
-                                            .frame(width: 1.5)
-                                            .offset(x: todayX)
-                                    }
-
-                                    // Barra interactiva de la tarea o subtarea
-                                    renderBar(for: item, totalWidth: contentWidth, scale: scale)
                                 }
-                                .frame(width: contentWidth, height: rowHeight)
-                                .background(index % 2 == 0 ? Color.clear : Color(nsColor: .separatorColor).opacity(0.04))
+                                .frame(width: contentWidth, height: 32)
+                                .background(Color(nsColor: .controlBackgroundColor))
+                                .overlay(Divider(), alignment: .bottom)
+
+                                // Filas de barras de tareas
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    ZStack(alignment: .leading) {
+                                        // Líneas verticales de rejilla
+                                        ForEach(scale.ticks, id: \.self) { tick in
+                                            let x = scale.xPosition(for: tick, totalWidth: contentWidth)
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.12))
+                                                .frame(width: 1)
+                                                .offset(x: x)
+                                        }
+
+                                        // Línea indicadora de Hoy
+                                        if scale.isTodayVisible {
+                                            let todayX = scale.xPosition(for: scale.today, totalWidth: contentWidth)
+                                            Rectangle()
+                                                .fill(Color.red.opacity(0.6))
+                                                .frame(width: 1.5)
+                                                .offset(x: todayX)
+                                        }
+
+                                        // Barra interactiva de la tarea o subtarea
+                                        renderBar(for: item, totalWidth: contentWidth, scale: scale)
+                                    }
+                                    .frame(width: contentWidth, height: rowHeight)
+                                    .background(index % 2 == 0 ? Color.clear : Color(nsColor: .separatorColor).opacity(0.04))
+                                    .overlay(Divider().opacity(0.4), alignment: .bottom)
+                                }
                             }
-                            .overlay(Divider().opacity(0.4), alignment: .bottom)
                         }
                     }
                 }

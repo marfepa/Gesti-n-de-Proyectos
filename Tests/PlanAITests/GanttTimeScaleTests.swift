@@ -182,4 +182,19 @@ final class GanttTimeScaleTests: XCTestCase {
         let snappedMid = scale.snapToDay(dateAtMid, calendar: calendar)
         XCTAssertEqual(snappedMid, midDate)
     }
+
+    func testTimelineContentWidthIncludesTrailingPadding() {
+        let calendar = fixedCalendar
+        let start = makeDate(year: 2026, month: 9, day: 17)
+        let end = makeDate(year: 2026, month: 10, day: 24) // 37 días
+        let scale = GanttTimeScale(dates: [start, end], calendar: calendar)
+
+        XCTAssertEqual(scale.totalDays, 37)
+        let baseContentWidth = CGFloat(scale.totalDays * 32)
+        let trailingPadding: CGFloat = 80
+        let totalContentWidth = max(700, baseContentWidth) + trailingPadding
+
+        XCTAssertEqual(totalContentWidth, 1184 + 80)
+        XCTAssertGreaterThan(totalContentWidth, baseContentWidth)
+    }
 }
