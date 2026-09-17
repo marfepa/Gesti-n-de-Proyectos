@@ -29,6 +29,25 @@ public struct TranscriptionLocaleOption: Identifiable, Hashable, Sendable {
     ]
 }
 
+/// Contenedor thread-safe para que el tap de Core Audio apunte siempre a la petición activa.
+private final class RecognitionRequestBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+
+    func update(_ request: SFSpeechAudioBufferRecognitionRequest?) {
+        lock.lock()
+        self.request = request
+        lock.unlock()
+    }
+
+    func append(_ buffer: AVAudioPCMBuffer) {
+        lock.lock()
+        let current = request
+        lock.unlock()
+        current?.append(buffer)
+    }
+}
+
 /// Servicio observable que orquesta la captura de audio con AVAudioEngine y la transcripción en vivo con Speech framework.
 @Observable
 @MainActor
@@ -51,8 +70,18 @@ public final class AudioTranscriptionService {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
+    private let requestBox = RecognitionRequestBox()
     private var durationTimer: Timer?
     private var textAppendHandler: (@MainActor (String) -> Void)?
+
+    /// Texto ya confirmado de segmentos anteriores (pausas / isFinal).
+    private var committedTranscript: String = ""
+    /// Hipótesis actual del segmento en curso.
+    private var currentPartial: String = ""
+    /// Invalida callbacks de tareas canceladas al reiniciar el reconocimiento.
+    private var recognitionGeneration: UInt64 = 0
+    private var isStopping: Bool = false
+    private var lastRestartAt: Date?
 
     public init() {
         setupRecognizer()
@@ -130,9 +159,13 @@ public final class AudioTranscriptionService {
         guard permissionsOk else { return }
 
         errorMessage = nil
+        stopRecordingInternal()
         liveTranscript = ""
         recordingDuration = 0
-        stopRecordingInternal()
+        committedTranscript = ""
+        currentPartial = ""
+        isStopping = false
+        lastRestartAt = nil
         textAppendHandler = onAppendText
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
@@ -141,15 +174,6 @@ public final class AudioTranscriptionService {
         }
 
         do {
-            let request = SFSpeechAudioBufferRecognitionRequest()
-            request.shouldReportPartialResults = true
-
-            if recognizer.supportsOnDeviceRecognition {
-                request.requiresOnDeviceRecognition = true
-            }
-
-            self.recognitionRequest = request
-
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
 
@@ -160,9 +184,8 @@ public final class AudioTranscriptionService {
 
             inputNode.removeTap(onBus: 0)
 
-            // El tap y el handler de Speech se construyen fuera de @MainActor:
-            // Core Audio y Speech los invocan en colas concurrentes.
-            let tapBlock = Self.makeAudioTapBlock(request: request)
+            // El tap se instala una vez y sigue a la petición vigente vía requestBox.
+            let tapBlock = Self.makeAudioTapBlock(requestBox: requestBox)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat, block: tapBlock)
 
             audioEngine.prepare()
@@ -170,15 +193,7 @@ public final class AudioTranscriptionService {
 
             self.isRecording = true
             startTimer()
-
-            self.recognitionTask = recognizer.recognitionTask(
-                with: request,
-                resultHandler: Self.makeRecognitionHandler { [weak self] text, isFinal, error in
-                    Task { @MainActor in
-                        self?.handleRecognitionUpdate(text: text, isFinal: isFinal, error: error)
-                    }
-                }
-            )
+            beginRecognitionTask(recognizer: recognizer)
         } catch {
             self.errorMessage = String(localized: "No se pudo inicializar la captura de audio: \(error.localizedDescription)")
             stopRecordingInternal()
@@ -188,33 +203,125 @@ public final class AudioTranscriptionService {
     /// Detiene la grabación y finaliza la sesión de transcripción.
     public func stopRecording() {
         guard isRecording else { return }
+        isStopping = true
+        commitPartialIfNeeded()
+        publishTranscript()
         stopRecordingInternal()
     }
 
-    private func handleRecognitionUpdate(text: String?, isFinal: Bool, error: Error?) {
+    private func handleRecognitionUpdate(text: String?, isFinal: Bool, error: Error?, generation: UInt64) {
+        guard generation == recognitionGeneration, isRecording, !isStopping else { return }
+
         if let text {
-            liveTranscript = text
-            textAppendHandler?(text)
+            currentPartial = text
+            publishTranscript()
         }
 
         if let error {
             let nsError = error as NSError
-            if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 {
-                errorMessage = error.localizedDescription
+            if Self.isRecoverableSpeechInterruption(nsError) {
+                commitPartialIfNeeded()
+                publishTranscript()
+                restartRecognition()
+                return
             }
+            errorMessage = error.localizedDescription
+            commitPartialIfNeeded()
+            publishTranscript()
             stopRecording()
             return
         }
 
         if isFinal {
-            stopRecording()
+            commitPartialIfNeeded()
+            publishTranscript()
+            restartRecognition()
         }
     }
 
+    private func beginRecognitionTask(recognizer: SFSpeechRecognizer) {
+        recognitionGeneration += 1
+        let generation = recognitionGeneration
+
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+
+        let request = Self.makeRecognitionRequest(supportsOnDevice: recognizer.supportsOnDeviceRecognition)
+        recognitionRequest = request
+        requestBox.update(request)
+
+        recognitionTask = recognizer.recognitionTask(
+            with: request,
+            resultHandler: Self.makeRecognitionHandler { [weak self] text, isFinal, error in
+                Task { @MainActor in
+                    self?.handleRecognitionUpdate(
+                        text: text,
+                        isFinal: isFinal,
+                        error: error,
+                        generation: generation
+                    )
+                }
+            }
+        )
+    }
+
+    private func restartRecognition() {
+        guard isRecording, !isStopping else { return }
+        if let lastRestartAt, Date().timeIntervalSince(lastRestartAt) < 0.2, recognitionTask != nil {
+            return
+        }
+        lastRestartAt = Date()
+
+        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+            errorMessage = String(localized: "El reconocedor de voz no está disponible para este idioma.")
+            stopRecording()
+            return
+        }
+
+        beginRecognitionTask(recognizer: recognizer)
+    }
+
+    private func commitPartialIfNeeded() {
+        let piece = currentPartial.trimmingCharacters(in: .whitespacesAndNewlines)
+        currentPartial = ""
+        guard !piece.isEmpty else { return }
+
+        if committedTranscript.isEmpty {
+            committedTranscript = piece
+            return
+        }
+
+        if committedTranscript.hasSuffix(piece) {
+            return
+        }
+
+        committedTranscript += " " + piece
+    }
+
+    private func combinedTranscript() -> String {
+        let committed = committedTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let partial = currentPartial.trimmingCharacters(in: .whitespacesAndNewlines)
+        if committed.isEmpty { return partial }
+        if partial.isEmpty { return committed }
+        if committed.hasSuffix(partial) { return committed }
+        return committed + " " + partial
+    }
+
+    private func publishTranscript() {
+        let combined = combinedTranscript()
+        liveTranscript = combined
+        textAppendHandler?(combined)
+    }
+
     private func stopRecordingInternal() {
+        recognitionGeneration += 1
+        isStopping = true
         stopTimer()
         isRecording = false
         textAppendHandler = nil
+        requestBox.update(nil)
 
         if audioEngine.isRunning {
             audioEngine.stop()
@@ -249,12 +356,36 @@ public final class AudioTranscriptionService {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
+    private static func makeRecognitionRequest(supportsOnDevice: Bool) -> SFSpeechAudioBufferRecognitionRequest {
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        request.taskHint = .dictation
+        request.addsPunctuation = true
+        if supportsOnDevice {
+            request.requiresOnDeviceRecognition = true
+        }
+        return request
+    }
+
+    /// Timeouts de silencio, fin de segmento y límite ~1 min: se reinicia la tarea, no la grabación.
+    private static func isRecoverableSpeechInterruption(_ error: NSError) -> Bool {
+        if error.domain == "kAFAssistantErrorDomain" {
+            switch error.code {
+            case 203, 209, 216, 1101, 1110:
+                return true
+            default:
+                return false
+            }
+        }
+        return false
+    }
+
     /// Cierre de tap sin aislamiento MainActor: Core Audio lo llama en un hilo de tiempo real.
     nonisolated private static func makeAudioTapBlock(
-        request: SFSpeechAudioBufferRecognitionRequest
+        requestBox: RecognitionRequestBox
     ) -> AVAudioNodeTapBlock {
         { buffer, _ in
-            request.append(buffer)
+            requestBox.append(buffer)
         }
     }
 
