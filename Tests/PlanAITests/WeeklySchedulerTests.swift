@@ -386,4 +386,54 @@ final class WeeklySchedulerTests: XCTestCase {
         XCTAssertEqual(result.scheduledItems[2].startMinute, 9 * 60 + 210) // 12:30
         XCTAssertEqual(result.scheduledItems[2].endMinute, 13 * 60) // 12:30 - 13:00
     }
+
+    func testParallelColumnsLayoutAvoidsOverlaps() {
+        let date = Date()
+        let item1 = ScheduledItem(
+            taskId: UUID(),
+            taskTitle: "Tarea A",
+            projectName: "Prj 1",
+            date: date,
+            startMinute: 9 * 60, // 09:00 - 11:00
+            endMinute: 11 * 60,
+            allocatedHours: 2.0,
+            isCompleted: false
+        )
+        let item2 = ScheduledItem(
+            taskId: UUID(),
+            taskTitle: "Tarea B",
+            projectName: "Prj 2",
+            date: date,
+            startMinute: 10 * 60, // 10:00 - 12:00 (solapa con A)
+            endMinute: 12 * 60,
+            allocatedHours: 2.0,
+            isCompleted: false
+        )
+        let item3 = ScheduledItem(
+            taskId: UUID(),
+            taskTitle: "Tarea C",
+            projectName: "Prj 3",
+            date: date,
+            startMinute: 13 * 60, // 13:00 - 14:00 (no solapa)
+            endMinute: 14 * 60,
+            allocatedHours: 1.0,
+            isCompleted: false
+        )
+
+        let positioned = WeeklyScheduleGridView.computeParallelColumns(items: [item1, item2, item3])
+        XCTAssertEqual(positioned.count, 3)
+
+        // item1 e item2 deben estar en el mismo cluster de 2 columnas con índices distintos
+        let pos1 = positioned.first { $0.item.taskTitle == "Tarea A" }!
+        let pos2 = positioned.first { $0.item.taskTitle == "Tarea B" }!
+        let pos3 = positioned.first { $0.item.taskTitle == "Tarea C" }!
+
+        XCTAssertEqual(pos1.totalColumns, 2)
+        XCTAssertEqual(pos2.totalColumns, 2)
+        XCTAssertNotEqual(pos1.columnIndex, pos2.columnIndex)
+
+        // item3 está solo en su cluster de 1 columna
+        XCTAssertEqual(pos3.totalColumns, 1)
+        XCTAssertEqual(pos3.columnIndex, 0)
+    }
 }
