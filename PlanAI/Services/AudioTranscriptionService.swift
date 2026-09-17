@@ -38,13 +38,13 @@ public final class AudioTranscriptionService {
     public var liveTranscript: String = ""
     public var errorMessage: String?
     public var isAuthorized: Bool = false
-    
+
     public var selectedLocaleOption: TranscriptionLocaleOption = TranscriptionLocaleOption.recommendedLocales[0] {
         didSet {
             setupRecognizer()
         }
     }
-    
+
     public var availableLocales: [TranscriptionLocaleOption] = TranscriptionLocaleOption.recommendedLocales
 
     private var speechRecognizer: SFSpeechRecognizer?
@@ -107,7 +107,7 @@ public final class AudioTranscriptionService {
     }
 
     /// Inicia la grabación del micrófono y la transcripción incremental en vivo.
-    public func startRecording(onAppendText: @escaping (String) -> Void) async {
+    public func startRecording(onAppendText: @escaping @MainActor (String) -> Void) async {
         guard !isRecording else { return }
 
         let permissionsOk = await requestPermissions()
@@ -138,6 +138,11 @@ public final class AudioTranscriptionService {
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
 
+            guard recordingFormat.sampleRate > 0 else {
+                self.errorMessage = String(localized: "No se detectó un dispositivo de entrada de audio válido.")
+                return
+            }
+
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
                 self?.recognitionRequest?.append(buffer)
@@ -149,26 +154,33 @@ public final class AudioTranscriptionService {
             self.isRecording = true
             startTimer()
 
+            // Despacho seguro en MainActor para todos los resultados y errores del reconocimiento
             self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-                guard let self = self else { return }
+                let formattedText = result?.bestTranscription.formattedString
+                let isFinal = result?.isFinal == true
+                let taskError = error
 
-                if let result = result {
-                    let formatted = result.bestTranscription.formattedString
-                    self.liveTranscript = formatted
-                    onAppendText(formatted)
-                }
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
 
-                if let error = error {
-                    // Si no es una cancelación intencionada, reportar el error
-                    let nsError = error as NSError
-                    if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 { // 203 = cancel
-                        self.errorMessage = error.localizedDescription
+                    if let text = formattedText {
+                        self.liveTranscript = text
+                        onAppendText(text)
                     }
-                    self.stopRecording()
-                }
 
-                if result?.isFinal == true {
-                    self.stopRecording()
+                    if let err = taskError {
+                        let nsError = err as NSError
+                        // Ignorar cancelación normal solicitada por el usuario
+                        if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 {
+                            self.errorMessage = err.localizedDescription
+                        }
+                        self.stopRecording()
+                        return
+                    }
+
+                    if isFinal {
+                        self.stopRecording()
+                    }
                 }
             }
         } catch {

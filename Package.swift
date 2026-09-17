@@ -17,7 +17,7 @@ let package = Package(
         .target(
             name: "PlanAICore",
             path: "PlanAI",
-            exclude: ["Info.plist", "App/PlanAIApp.swift"],
+            exclude: ["Info.plist", "PlanAI.entitlements", "App/PlanAIApp.swift"],
             resources: [
                 .process("Localization/Resources")
             ]
