@@ -57,4 +57,40 @@ final class TaskDecompositionTests: XCTestCase {
 
         XCTAssertEqual(project.progress, 0.5)
     }
+
+    func testTargetEndDateWindowCompression() {
+        let service = TaskDecompositionService()
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        // Ventana deseada de 10 días
+        let targetEnd = calendar.date(byAdding: .day, value: 10, to: start)!
+
+        // Las subtasks suman 20 días (3 + 7 + 10)
+        let subtasks = [
+            SubtaskPlan(title: "Fase 1", estimatedDays: 3, notes: ""),
+            SubtaskPlan(title: "Fase 2", estimatedDays: 7, notes: ""),
+            SubtaskPlan(title: "Fase 3", estimatedDays: 10, notes: "")
+        ]
+
+        let payloads = service.buildTaskPayloads(
+            from: subtasks,
+            startingAt: start,
+            targetEndDate: targetEnd,
+            calendar: calendar
+        )
+
+        let totalCompressedDays = payloads.reduce(0) { $0 + $1.estimatedDays }
+        // La suma de días comprimidos debe ajustarse aproximadamente a la ventana de 10 días
+        XCTAssertLessThanOrEqual(totalCompressedDays, 12)
+        XCTAssertGreaterThanOrEqual(totalCompressedDays, 8)
+    }
+
+    func testLargeTaskSubtaskDecomposition() {
+        let service = TaskDecompositionService()
+        let subtasks = service.decomposeTaskIntoSubtasks(taskTitle: "Refactorización Arquitectura", estimatedHours: 8.0)
+
+        XCTAssertEqual(subtasks.count, 3)
+        let sumHours = subtasks.reduce(0.0) { $0 + $1.hours }
+        XCTAssertEqual(sumHours, 8.0)
+    }
 }

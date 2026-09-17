@@ -16,7 +16,9 @@
 		25E050BB88C1628F428FA52E /* PlanAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B05E4582ED3F3A03DB8B1A /* PlanAIApp.swift */; };
 		312650D1DCD7ACB6AF5D95F5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D76D706E21F9E719783DC87 /* ContentView.swift */; };
 		352EF1C4BE62E5BB98962ADE /* WeeklySchedulerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C414308B6A033F8DE2D18545 /* WeeklySchedulerService.swift */; };
+		383C8C529EC973108CA73156 /* ProjectEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFC80562BCA6CEA19E8D009 /* ProjectEditSheet.swift */; };
 		469BBCBCC433C985A3737B8E /* WeeklySchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF65DF172C933CE3C77184D5 /* WeeklySchedulerTests.swift */; };
+		678A518A9E7A420F8BAAE5E1 /* ProjectSubtask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DCC5F228AE560C2FEBD159D /* ProjectSubtask.swift */; };
 		709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */; };
 		813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5487C1BEB5E269B777A4877A /* ProjectInputView.swift */; };
 		8274EFE9C9AF24D3F6D0CC27 /* GenerablePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */; };
@@ -49,6 +51,7 @@
 		0D95202D689690C6C712033E /* AudioTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTranscriptionService.swift; sourceTree = "<group>"; };
 		0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViewModel.swift; sourceTree = "<group>"; };
 		198099C7483DDD050D604FDF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3DCC5F228AE560C2FEBD159D /* ProjectSubtask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSubtask.swift; sourceTree = "<group>"; };
 		4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditSheet.swift; sourceTree = "<group>"; };
 		5487C1BEB5E269B777A4877A /* ProjectInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInputView.swift; sourceTree = "<group>"; };
 		54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerablePlan.swift; sourceTree = "<group>"; };
@@ -72,6 +75,7 @@
 		CD567D2AE71BA320EE8A46BE /* PlanAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlanAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2CDF3CB1C83A7D4C396D328 /* MonthlyScheduleGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyScheduleGridView.swift; sourceTree = "<group>"; };
 		ED8F8393A159DC2EEC327116 /* PlanAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlanAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EEFC80562BCA6CEA19E8D009 /* ProjectEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectEditSheet.swift; sourceTree = "<group>"; };
 		EF65DF172C933CE3C77184D5 /* WeeklySchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySchedulerTests.swift; sourceTree = "<group>"; };
 		F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
 		FDE6984013676CCBDF00DCEC /* PlanAI.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PlanAI.entitlements; sourceTree = "<group>"; };
@@ -92,6 +96,7 @@
 			children = (
 				54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */,
 				8C5CDFD9DAE28D9627B7F0CE /* Project.swift */,
+				3DCC5F228AE560C2FEBD159D /* ProjectSubtask.swift */,
 				769D313F968862C918E89E87 /* ProjectTask.swift */,
 				948F92843BD2C81AE242FE89 /* WorkSlot.swift */,
 			);
@@ -131,6 +136,7 @@
 				7F9F1DC545F2BE20240DC329 /* GanttChartView.swift */,
 				E2CDF3CB1C83A7D4C396D328 /* MonthlyScheduleGridView.swift */,
 				F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */,
+				EEFC80562BCA6CEA19E8D009 /* ProjectEditSheet.swift */,
 				5487C1BEB5E269B777A4877A /* ProjectInputView.swift */,
 				4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */,
 				6519F9C103F89FC2055344A7 /* TaskListView.swift */,
@@ -317,7 +323,9 @@
 				25E050BB88C1628F428FA52E /* PlanAIApp.swift in Sources */,
 				EFC64112F1F8FB63D8177C7C /* Project.swift in Sources */,
 				F4845E9D8E30A2D915AC610D /* ProjectDetailView.swift in Sources */,
+				383C8C529EC973108CA73156 /* ProjectEditSheet.swift in Sources */,
 				813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */,
+				678A518A9E7A420F8BAAE5E1 /* ProjectSubtask.swift in Sources */,
 				F2BED910A196DBAF3808C164 /* ProjectTask.swift in Sources */,
 				709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */,
 				24742F34ED6B32E12CB4481D /* TaskDecompositionService.swift in Sources */,

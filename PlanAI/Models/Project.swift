@@ -38,6 +38,7 @@ public final class Project: Identifiable {
     public var name: String = ""
     public var projectDescription: String = ""
     public var startDate: Date = Date()
+    public var targetEndDate: Date?
     public var createdAt: Date = Date()
     public var priorityRawValue: Int = ProjectPriority.media.rawValue
 
@@ -54,6 +55,7 @@ public final class Project: Identifiable {
         name: String,
         projectDescription: String = "",
         startDate: Date = Date(),
+        targetEndDate: Date? = nil,
         createdAt: Date = Date(),
         priority: ProjectPriority = .media
     ) {
@@ -61,6 +63,7 @@ public final class Project: Identifiable {
         self.name = name
         self.projectDescription = projectDescription
         self.startDate = startDate
+        self.targetEndDate = targetEndDate
         self.createdAt = createdAt
         self.priorityRawValue = priority.rawValue
         self.tasks = []
@@ -86,6 +89,25 @@ public final class Project: Identifiable {
     /// Fecha de finalización estimada del proyecto (fin de la última tarea).
     public var estimatedEndDate: Date {
         tasks.map(\.endDate).max() ?? startDate
+    }
+
+    /// Fecha límite efectiva: la fecha objetivo definida por el usuario o, si no existe, la fecha estimada de tareas.
+    public var effectiveDeadline: Date {
+        targetEndDate ?? estimatedEndDate
+    }
+
+    /// Indica si el plan de tareas actual desborda la fecha límite objetivo.
+    public var isOverdueOrExceedsTarget: Bool {
+        guard let target = targetEndDate else { return false }
+        return estimatedEndDate > target
+    }
+
+    /// Días de desfase respecto a la fecha objetivo (positivo = retraso/exceso, negativo = holgura).
+    public var targetVarianceInDays: Int {
+        guard let target = targetEndDate else { return 0 }
+        let calendar = Calendar.current
+        let comps = calendar.dateComponents([.day], from: target, to: estimatedEndDate)
+        return comps.day ?? 0
     }
 
     /// Duración total estimada en días.

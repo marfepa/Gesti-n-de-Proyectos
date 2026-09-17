@@ -125,10 +125,10 @@ public final class WeeklySchedulerService: Sendable {
 
         for project in projects {
             let pendingTasks = project.sortedTasks.filter { !$0.isCompleted }
-            let deadline = project.estimatedEndDate
+            let deadline = project.effectiveDeadline
             let priority = project.priority
             for task in pendingTasks {
-                let hours = max(0.5, task.estimatedHours)
+                let hours = max(0.5, task.effectiveEstimatedHours)
                 totalDemand += hours
                 candidates.append(
                     TaskCandidate(

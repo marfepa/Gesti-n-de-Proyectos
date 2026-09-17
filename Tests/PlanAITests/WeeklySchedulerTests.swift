@@ -193,4 +193,89 @@ final class WeeklySchedulerTests: XCTestCase {
         XCTAssertEqual(result.scheduledItems.first?.projectPriority, .urgente)
         XCTAssertEqual(result.unscheduledTasks.first?.taskTitle, "Low Priority Task")
     }
+
+    func testProjectTargetEndDateTakesPrecedenceWhenEqualPriority() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
+
+        // Proyecto A: Tiene targetEndDate explícito en 2 días
+        let targetProj = Project(
+            name: "Project Target 2 Days",
+            startDate: refDate,
+            targetEndDate: calendar.date(byAdding: .day, value: 2, to: refDate)!,
+            priority: .media
+        )
+        let targetTask = ProjectTask(
+            title: "Must Finish for Target",
+            startDate: refDate,
+            endDate: calendar.date(byAdding: .day, value: 10, to: refDate)!,
+            estimatedHours: 2.0,
+            project: targetProj
+        )
+        targetProj.tasks = [targetTask]
+
+        // Proyecto B: Sin targetEndDate, termina en 6 días
+        let regularProj = Project(
+            name: "Project Regular 6 Days",
+            startDate: refDate,
+            priority: .media
+        )
+        let regularTask = ProjectTask(
+            title: "Regular Task",
+            startDate: refDate,
+            endDate: calendar.date(byAdding: .day, value: 6, to: refDate)!,
+            estimatedHours: 2.0,
+            project: regularProj
+        )
+        regularProj.tasks = [regularTask]
+
+        // Slot de 2 horas
+        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 11 * 60)
+
+        let result = service.schedule(
+            projects: [regularProj, targetProj],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        // El proyecto con targetEndDate más temprano (2 días) debe asignarse antes que el de 6 días
+        XCTAssertEqual(result.scheduledItems.first?.taskTitle, "Must Finish for Target")
+    }
+
+    func testSubtaskHoursTakeEffectInProjectDemand() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))!
+
+        let project = Project(name: "Subtask Project", startDate: refDate)
+        let parentTask = ProjectTask(
+            title: "Parent Task",
+            startDate: refDate,
+            endDate: refDate,
+            estimatedHours: 10.0, // Horas declaradas
+            project: project
+        )
+        // Pero tiene 2 subtareas concretas de 1.5h cada una = 3.0h reales
+        let sub1 = ProjectSubtask(title: "Sub 1", estimatedHours: 1.5, task: parentTask)
+        let sub2 = ProjectSubtask(title: "Sub 2", estimatedHours: 1.5, task: parentTask)
+        parentTask.subtasks = [sub1, sub2]
+        project.tasks = [parentTask]
+
+        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 15 * 60)
+
+        let result = service.schedule(
+            projects: [project],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        // La demanda efectiva debe ser 3.0h (la suma de subtareas), no 10.0h
+        XCTAssertEqual(result.totalDemandHours, 3.0)
+        XCTAssertEqual(result.scheduledItems.first?.allocatedHours, 3.0)
+    }
 }
