@@ -1,0 +1,199 @@
+import SwiftUI
+import SwiftData
+
+public enum DetailTabMode: String, CaseIterable, Identifiable {
+    case gantt
+    case list
+    case split
+
+    public var id: String { rawValue }
+
+    public var localizedLabel: String {
+        switch self {
+        case .gantt: return String(localized: "Gantt")
+        case .list: return String(localized: "Lista")
+        case .split: return String(localized: "Ambos")
+        }
+    }
+
+    public var iconName: String {
+        switch self {
+        case .gantt: return "chart.bar.xaxis"
+        case .list: return "list.bullet"
+        case .split: return "square.split.2x1"
+        }
+    }
+}
+
+public struct ProjectDetailView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Bindable public var project: Project
+    public let viewModel: ProjectViewModel
+
+    @State private var selectedTab: DetailTabMode = .split
+    @State private var selectedTask: ProjectTask?
+
+    public init(project: Project, viewModel: ProjectViewModel) {
+        self.project = project
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            // Cabecera del Proyecto
+            projectHeader
+                .padding()
+                .background(Color(nsColor: .windowBackgroundColor))
+
+            Divider()
+
+            // Contenido según el modo seleccionado
+            Group {
+                switch selectedTab {
+                case .gantt:
+                    GanttChartView(
+                        tasks: project.sortedTasks,
+                        selectedTask: $selectedTask,
+                        onEditTask: { task in
+                            viewModel.editingTask = task
+                            viewModel.showingTaskSheet = true
+                        }
+                    )
+                    .padding()
+
+                case .list:
+                    TaskListView(
+                        tasks: project.sortedTasks,
+                        onToggle: { task in
+                            viewModel.toggleTaskCompletion(task, context: modelContext)
+                        },
+                        onEdit: { task in
+                            viewModel.editingTask = task
+                            viewModel.showingTaskSheet = true
+                        },
+                        onDelete: { task in
+                            viewModel.deleteTask(task, context: modelContext)
+                        }
+                    )
+
+                case .split:
+                    VSplitView {
+                        GanttChartView(
+                            tasks: project.sortedTasks,
+                            selectedTask: $selectedTask,
+                            onEditTask: { task in
+                                viewModel.editingTask = task
+                                viewModel.showingTaskSheet = true
+                            }
+                        )
+                        .frame(minHeight: 220)
+                        .padding(.horizontal)
+                        .padding(.top)
+
+                        TaskListView(
+                            tasks: project.sortedTasks,
+                            onToggle: { task in
+                                viewModel.toggleTaskCompletion(task, context: modelContext)
+                            },
+                            onEdit: { task in
+                                viewModel.editingTask = task
+                                viewModel.showingTaskSheet = true
+                            },
+                            onDelete: { task in
+                                viewModel.deleteTask(task, context: modelContext)
+                            }
+                        )
+                        .frame(minHeight: 180)
+                    }
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("", selection: $selectedTab) {
+                    ForEach(DetailTabMode.allCases) { mode in
+                        Label(mode.localizedLabel, systemImage: mode.iconName)
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 220)
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: {
+                    viewModel.editingTask = nil
+                    viewModel.showingTaskSheet = true
+                }) {
+                    Label(String(localized: "Añadir Tarea"), systemImage: "plus")
+                }
+                .help(String(localized: "Añadir una tarea manual a este proyecto"))
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingTaskSheet },
+            set: { viewModel.showingTaskSheet = $0 }
+        )) {
+            TaskEditSheet(
+                task: viewModel.editingTask,
+                onSave: { title, notes, start, end in
+                    viewModel.saveTask(
+                        title: title,
+                        notes: notes,
+                        startDate: start,
+                        endDate: end,
+                        in: project,
+                        context: modelContext
+                    )
+                }
+            )
+        }
+    }
+
+    private var projectHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(project.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    if !project.projectDescription.isEmpty {
+                        Text(project.projectDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Spacer()
+
+                // Indicadores de resumen
+                HStack(spacing: 20) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(localized: "Duración"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(project.totalDurationInDays) " + String(localized: "días"))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(localized: "Progreso"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text("\(Int(project.progress * 100))%")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(project.progress == 1.0 ? .green : .blue)
+                    }
+                }
+            }
+
+            // Barra de progreso visual
+            ProgressView(value: project.progress)
+                .tint(project.progress == 1.0 ? .green : .blue)
+        }
+    }
+}

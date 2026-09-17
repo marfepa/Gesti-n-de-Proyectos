@@ -1,0 +1,540 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A0712FC7CAF2BF6CEB58D8C /* GanttChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F9F1DC545F2BE20240DC329 /* GanttChartView.swift */; };
+		10C530669D3B5FA63ED705C2 /* AIAvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */; };
+		166C1A4ADC40B18943DBD8E6 /* AIStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7547B5CE61B5E89E7458DB8 /* AIStatusBanner.swift */; };
+		1E15D36797489A41A4FDD70A /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6519F9C103F89FC2055344A7 /* TaskListView.swift */; };
+		24742F34ED6B32E12CB4481D /* TaskDecompositionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C2E3C9D42B542CA513B7B9 /* TaskDecompositionService.swift */; };
+		25E050BB88C1628F428FA52E /* PlanAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B05E4582ED3F3A03DB8B1A /* PlanAIApp.swift */; };
+		312650D1DCD7ACB6AF5D95F5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D76D706E21F9E719783DC87 /* ContentView.swift */; };
+		709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */; };
+		813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5487C1BEB5E269B777A4877A /* ProjectInputView.swift */; };
+		8274EFE9C9AF24D3F6D0CC27 /* GenerablePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */; };
+		B79EF63F8A19517E9ADD6BE2 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = C6151A7E6B60A91DC3BEFCF5 /* Localizable.strings */; };
+		E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */; };
+		EFC64112F1F8FB63D8177C7C /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5CDFD9DAE28D9627B7F0CE /* Project.swift */; };
+		F2BED910A196DBAF3808C164 /* ProjectTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769D313F968862C918E89E87 /* ProjectTask.swift */; };
+		F4845E9D8E30A2D915AC610D /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */; };
+		F5484B32124272E1CCA31B3F /* TaskDecompositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D88DFF0EAC490B0BC2506A7 /* TaskDecompositionTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		9BCDDE8D2B3F2ED64635CD9F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E271FA27D23ACB8BDDF1F1A1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F02E5A4E2ED3A73DE07598C4;
+			remoteInfo = PlanAI;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0D76D706E21F9E719783DC87 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViewModel.swift; sourceTree = "<group>"; };
+		198099C7483DDD050D604FDF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditSheet.swift; sourceTree = "<group>"; };
+		5487C1BEB5E269B777A4877A /* ProjectInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInputView.swift; sourceTree = "<group>"; };
+		54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerablePlan.swift; sourceTree = "<group>"; };
+		64C16BD217369DE413CC4118 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		6519F9C103F89FC2055344A7 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
+		70C2E3C9D42B542CA513B7B9 /* TaskDecompositionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDecompositionService.swift; sourceTree = "<group>"; };
+		769D313F968862C918E89E87 /* ProjectTask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTask.swift; sourceTree = "<group>"; };
+		7D88DFF0EAC490B0BC2506A7 /* TaskDecompositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDecompositionTests.swift; sourceTree = "<group>"; };
+		7F9F1DC545F2BE20240DC329 /* GanttChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanttChartView.swift; sourceTree = "<group>"; };
+		8C5CDFD9DAE28D9627B7F0CE /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAvailabilityService.swift; sourceTree = "<group>"; };
+		A7547B5CE61B5E89E7458DB8 /* AIStatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIStatusBanner.swift; sourceTree = "<group>"; };
+		B3B05E4582ED3F3A03DB8B1A /* PlanAIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanAIApp.swift; sourceTree = "<group>"; };
+		B6C7B227843D3CE074AF7003 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
+		CD567D2AE71BA320EE8A46BE /* PlanAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlanAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		ED8F8393A159DC2EEC327116 /* PlanAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlanAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0BA5582A461B6B8EC6637F40 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				ED8F8393A159DC2EEC327116 /* PlanAI.app */,
+				CD567D2AE71BA320EE8A46BE /* PlanAITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0BE2AF93E6B95C2F213FFFFC /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */,
+				8C5CDFD9DAE28D9627B7F0CE /* Project.swift */,
+				769D313F968862C918E89E87 /* ProjectTask.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		1117E5F43674584105F6086C /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B3B05E4582ED3F3A03DB8B1A /* PlanAIApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		3EF9F21D2825F32C9313028C /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				FA9F9B96E44D99B2D422374A /* PlanAITests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		5122892E72BFD7CC30787293 = {
+			isa = PBXGroup;
+			children = (
+				EE1923AE62C413F14A7D3800 /* PlanAI */,
+				3EF9F21D2825F32C9313028C /* Tests */,
+				0BA5582A461B6B8EC6637F40 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		723DE756675409C6B4498CC8 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A7547B5CE61B5E89E7458DB8 /* AIStatusBanner.swift */,
+				0D76D706E21F9E719783DC87 /* ContentView.swift */,
+				7F9F1DC545F2BE20240DC329 /* GanttChartView.swift */,
+				F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */,
+				5487C1BEB5E269B777A4877A /* ProjectInputView.swift */,
+				4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */,
+				6519F9C103F89FC2055344A7 /* TaskListView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		8A9834705463E8C66DF795BD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C6151A7E6B60A91DC3BEFCF5 /* Localizable.strings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		95488A8E3CA3B81A09127604 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		BBC32C2D87E4180710EB287E /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */,
+				70C2E3C9D42B542CA513B7B9 /* TaskDecompositionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		CD43DA28F3FEF6679ACABE49 /* Localization */ = {
+			isa = PBXGroup;
+			children = (
+				8A9834705463E8C66DF795BD /* Resources */,
+			);
+			path = Localization;
+			sourceTree = "<group>";
+		};
+		EE1923AE62C413F14A7D3800 /* PlanAI */ = {
+			isa = PBXGroup;
+			children = (
+				198099C7483DDD050D604FDF /* Info.plist */,
+				1117E5F43674584105F6086C /* App */,
+				CD43DA28F3FEF6679ACABE49 /* Localization */,
+				0BE2AF93E6B95C2F213FFFFC /* Models */,
+				BBC32C2D87E4180710EB287E /* Services */,
+				95488A8E3CA3B81A09127604 /* ViewModels */,
+				723DE756675409C6B4498CC8 /* Views */,
+			);
+			path = PlanAI;
+			sourceTree = "<group>";
+		};
+		FA9F9B96E44D99B2D422374A /* PlanAITests */ = {
+			isa = PBXGroup;
+			children = (
+				7D88DFF0EAC490B0BC2506A7 /* TaskDecompositionTests.swift */,
+			);
+			path = PlanAITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		44A7A68F217CA24076F32966 /* PlanAITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A749103BD1CD5E6DB38AD838 /* Build configuration list for PBXNativeTarget "PlanAITests" */;
+			buildPhases = (
+				5D3B86B77AE435AA4A1FE344 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6CE97042A9E02F56D340533C /* PBXTargetDependency */,
+			);
+			name = PlanAITests;
+			packageProductDependencies = (
+			);
+			productName = PlanAITests;
+			productReference = CD567D2AE71BA320EE8A46BE /* PlanAITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F02E5A4E2ED3A73DE07598C4 /* PlanAI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 060DCD959230B1D470176229 /* Build configuration list for PBXNativeTarget "PlanAI" */;
+			buildPhases = (
+				F2A487C73720FDDFC7FC765B /* Sources */,
+				DE72EE7DE83F40C16FD4FDDE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PlanAI;
+			packageProductDependencies = (
+			);
+			productName = PlanAI;
+			productReference = ED8F8393A159DC2EEC327116 /* PlanAI.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E271FA27D23ACB8BDDF1F1A1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = E65919B131F33B19B0E29D71 /* Build configuration list for PBXProject "PlanAI" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+				es,
+			);
+			mainGroup = 5122892E72BFD7CC30787293;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0BA5582A461B6B8EC6637F40 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F02E5A4E2ED3A73DE07598C4 /* PlanAI */,
+				44A7A68F217CA24076F32966 /* PlanAITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DE72EE7DE83F40C16FD4FDDE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B79EF63F8A19517E9ADD6BE2 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5D3B86B77AE435AA4A1FE344 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5484B32124272E1CCA31B3F /* TaskDecompositionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2A487C73720FDDFC7FC765B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10C530669D3B5FA63ED705C2 /* AIAvailabilityService.swift in Sources */,
+				166C1A4ADC40B18943DBD8E6 /* AIStatusBanner.swift in Sources */,
+				312650D1DCD7ACB6AF5D95F5 /* ContentView.swift in Sources */,
+				0A0712FC7CAF2BF6CEB58D8C /* GanttChartView.swift in Sources */,
+				8274EFE9C9AF24D3F6D0CC27 /* GenerablePlan.swift in Sources */,
+				25E050BB88C1628F428FA52E /* PlanAIApp.swift in Sources */,
+				EFC64112F1F8FB63D8177C7C /* Project.swift in Sources */,
+				F4845E9D8E30A2D915AC610D /* ProjectDetailView.swift in Sources */,
+				813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */,
+				F2BED910A196DBAF3808C164 /* ProjectTask.swift in Sources */,
+				709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */,
+				24742F34ED6B32E12CB4481D /* TaskDecompositionService.swift in Sources */,
+				E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */,
+				1E15D36797489A41A4FDD70A /* TaskListView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6CE97042A9E02F56D340533C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F02E5A4E2ED3A73DE07598C4 /* PlanAI */;
+			targetProxy = 9BCDDE8D2B3F2ED64635CD9F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		C6151A7E6B60A91DC3BEFCF5 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				64C16BD217369DE413CC4118 /* en */,
+				B6C7B227843D3CE074AF7003 /* es */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		0FB7CEB412AAC82009E532C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		44B9F43DC180375696290566 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PlanAI/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.planai.app;
+				PRODUCT_NAME = PlanAI;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Debug;
+		};
+		466B75D42EBEA63EBBB06E2B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.planai.PlanAITests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlanAI.app/Contents/MacOS/PlanAI";
+			};
+			name = Release;
+		};
+		54663D44BE20DB7DC4381142 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PlanAI/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.planai.app;
+				PRODUCT_NAME = PlanAI;
+				SDKROOT = macosx;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Release;
+		};
+		6070E568A07409E5DBB1ACFF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		60B4C74A340EEBE3AF77E8C6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.planai.PlanAITests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlanAI.app/Contents/MacOS/PlanAI";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		060DCD959230B1D470176229 /* Build configuration list for PBXNativeTarget "PlanAI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				44B9F43DC180375696290566 /* Debug */,
+				54663D44BE20DB7DC4381142 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A749103BD1CD5E6DB38AD838 /* Build configuration list for PBXNativeTarget "PlanAITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				60B4C74A340EEBE3AF77E8C6 /* Debug */,
+				466B75D42EBEA63EBBB06E2B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E65919B131F33B19B0E29D71 /* Build configuration list for PBXProject "PlanAI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6070E568A07409E5DBB1ACFF /* Debug */,
+				0FB7CEB412AAC82009E532C7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E271FA27D23ACB8BDDF1F1A1 /* Project object */;
+}
