@@ -57,6 +57,9 @@ public struct ProjectDetailView: View {
                         onEditTask: { task in
                             viewModel.editingTask = task
                             viewModel.showingTaskSheet = true
+                        },
+                        onTaskDateChanged: { task, newStart, newEnd in
+                            viewModel.updateTaskDates(task: task, newStart: newStart, newEnd: newEnd, context: modelContext)
                         }
                     )
                     .padding()
@@ -96,6 +99,9 @@ public struct ProjectDetailView: View {
                             onEditTask: { task in
                                 viewModel.editingTask = task
                                 viewModel.showingTaskSheet = true
+                            },
+                            onTaskDateChanged: { task, newStart, newEnd in
+                                viewModel.updateTaskDates(task: task, newStart: newStart, newEnd: newEnd, context: modelContext)
                             }
                         )
                         .frame(minHeight: 220)

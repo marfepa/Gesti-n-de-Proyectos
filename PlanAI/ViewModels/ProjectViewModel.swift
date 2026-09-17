@@ -200,6 +200,31 @@ public final class ProjectViewModel {
         self.showingTaskSheet = false
     }
 
+    /// Actualiza directamente las fechas de una tarea (por resize o drag en Gantt), recalculando días y horas.
+    public func updateTaskDates(
+        task: ProjectTask,
+        newStart: Date,
+        newEnd: Date,
+        context: ModelContext
+    ) {
+        let calendar = Calendar.current
+        let normalizedStart = calendar.startOfDay(for: newStart)
+        var normalizedEnd = calendar.startOfDay(for: newEnd)
+        if normalizedEnd < normalizedStart {
+            normalizedEnd = normalizedStart
+        }
+
+        let comps = calendar.dateComponents([.day], from: normalizedStart, to: normalizedEnd)
+        let days = max(1, comps.day ?? 1)
+
+        task.startDate = normalizedStart
+        task.endDate = normalizedEnd
+        task.estimatedDays = days
+        task.estimatedHours = Double(days * 4)
+
+        try? context.save()
+    }
+
     /// Alterna el estado de completado de una tarea.
     public func toggleTaskCompletion(_ task: ProjectTask, context: ModelContext) {
         task.isCompleted.toggle()
