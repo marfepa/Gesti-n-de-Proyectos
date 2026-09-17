@@ -3,6 +3,23 @@ import SwiftUI
 import Speech
 import AVFoundation
 
+/// Estados del ciclo de vida de captura y transcripción offline.
+public enum TranscriptionPhase: Sendable, Equatable {
+    case idle
+    case recording
+    case transcribing
+    case completed
+    case error(String)
+
+    public var isRecording: Bool {
+        self == .recording
+    }
+
+    public var isTranscribing: Bool {
+        self == .transcribing
+    }
+}
+
 /// Opción de idioma seleccionable para el motor de transcripción de Apple.
 public struct TranscriptionLocaleOption: Identifiable, Hashable, Sendable {
     public let id: String
@@ -29,67 +46,66 @@ public struct TranscriptionLocaleOption: Identifiable, Hashable, Sendable {
     ]
 }
 
-/// Contenedor thread-safe para que el tap de Core Audio apunte siempre a la petición activa.
-private final class RecognitionRequestBox: @unchecked Sendable {
+/// Grabador thread-safe para volcar buffers de audio de Core Audio directamente a un archivo de disco.
+private final class AudioFileWriter: @unchecked Sendable {
     private let lock = NSLock()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var audioFile: AVAudioFile?
+    private(set) var fileURL: URL?
 
-    func update(_ request: SFSpeechAudioBufferRecognitionRequest?) {
+    func startWriting(to url: URL, format: AVAudioFormat) throws {
         lock.lock()
-        self.request = request
-        lock.unlock()
+        defer { lock.unlock() }
+        self.fileURL = url
+        self.audioFile = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) {
+    func write(buffer: AVAudioPCMBuffer) {
         lock.lock()
-        let current = request
-        lock.unlock()
-        current?.append(buffer)
+        defer { lock.unlock() }
+        try? audioFile?.write(from: buffer)
+    }
+
+    func finish() {
+        lock.lock()
+        defer { lock.unlock() }
+        audioFile = nil
     }
 }
 
-/// Servicio observable que orquesta la captura de audio con AVAudioEngine y la transcripción en vivo con Speech framework.
+/// Servicio observable que orquesta la captura de audio a archivo temporal y su posterior transcripción offline.
 @Observable
 @MainActor
 public final class AudioTranscriptionService {
-    public var isRecording: Bool = false
+    public var phase: TranscriptionPhase = .idle
     public var recordingDuration: TimeInterval = 0
-    public var liveTranscript: String = ""
+    public var transcriptionProgress: Double = 0.0
+    public var transcribedText: String = ""
     public var errorMessage: String?
     public var isAuthorized: Bool = false
+    public var recordedFileURL: URL?
 
-    public var selectedLocaleOption: TranscriptionLocaleOption = TranscriptionLocaleOption.recommendedLocales[0] {
-        didSet {
-            setupRecognizer()
-        }
+    public var isRecording: Bool {
+        phase == .recording
     }
 
+    public var isTranscribing: Bool {
+        phase == .transcribing
+    }
+
+    public var selectedLocaleOption: TranscriptionLocaleOption = TranscriptionLocaleOption.recommendedLocales[0]
     public var availableLocales: [TranscriptionLocaleOption] = TranscriptionLocaleOption.recommendedLocales
 
-    private var speechRecognizer: SFSpeechRecognizer?
-    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
-    private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
-    private let requestBox = RecognitionRequestBox()
+    private let fileWriter = AudioFileWriter()
     private var durationTimer: Timer?
-    private var textAppendHandler: (@MainActor (String) -> Void)?
-
-    /// Texto ya confirmado de segmentos anteriores (pausas / isFinal).
-    private var committedTranscript: String = ""
-    /// Hipótesis actual del segmento en curso.
-    private var currentPartial: String = ""
-    /// Invalida callbacks de tareas canceladas al reiniciar el reconocimiento.
-    private var recognitionGeneration: UInt64 = 0
-    private var isStopping: Bool = false
-    private var lastRestartAt: Date?
+    private var activeTranscriptionTask: Task<String, Error>?
 
     public init() {
-        setupRecognizer()
         detectSupportedLocales()
     }
 
-    private func setupRecognizer() {
-        speechRecognizer = SFSpeechRecognizer(locale: selectedLocaleOption.locale)
+    deinit {
+        // En Swift 6, MainActor class deinit corre nonisolated
     }
 
     private func detectSupportedLocales() {
@@ -110,7 +126,7 @@ public final class AudioTranscriptionService {
         }
     }
 
-    /// Solicita permisos de Micrófono y Reconocimiento de Voz a macOS garantizando ejecución en la cola principal.
+    /// Solicita permisos de Micrófono y Reconocimiento de Voz a macOS.
     public func requestPermissions() async -> Bool {
         let speechStatus = SFSpeechRecognizer.authorizationStatus()
         let speechGranted: Bool
@@ -146,259 +162,281 @@ public final class AudioTranscriptionService {
 
         self.isAuthorized = speechGranted && micGranted
         if !self.isAuthorized {
-            self.errorMessage = String(localized: "Se requieren permisos de Micrófono y Reconocimiento de Voz para dictar.")
+            self.errorMessage = String(localized: "Se requieren permisos de Micrófono y Reconocimiento de Voz para transcribir.")
         }
         return self.isAuthorized
     }
 
-    /// Inicia la grabación del micrófono y la transcripción incremental en vivo.
-    public func startRecording(onAppendText: @escaping @MainActor (String) -> Void) async {
+    /// Comienza la grabación de audio del micrófono y escribe los buffers a un archivo temporal .caf en disco.
+    public func startRecording() async {
         guard !isRecording else { return }
 
-        let permissionsOk = await requestPermissions()
-        guard permissionsOk else { return }
+        let hasPermissions = await requestPermissions()
+        guard hasPermissions else { return }
 
-        errorMessage = nil
-        stopRecordingInternal()
-        liveTranscript = ""
-        recordingDuration = 0
-        committedTranscript = ""
-        currentPartial = ""
-        isStopping = false
-        lastRestartAt = nil
-        textAppendHandler = onAppendText
+        // Limpiar grabación previa si existiera
+        cleanupTempFile()
+        self.errorMessage = nil
+        self.transcribedText = ""
+        self.transcriptionProgress = 0.0
 
-        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
-            self.errorMessage = String(localized: "El reconocedor de voz no está disponible para este idioma.")
-            return
-        }
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent("planai_rec_\(UUID().uuidString).caf")
+        self.recordedFileURL = fileURL
 
         do {
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
 
             guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
-                self.errorMessage = String(localized: "No se detectó un dispositivo de entrada de audio válido.")
-                return
+                throw NSError(domain: "PlanAI.Audio", code: 1, userInfo: [NSLocalizedDescriptionKey: "Formato de micrófono no válido."])
             }
 
-            inputNode.removeTap(onBus: 0)
+            try fileWriter.startWriting(to: fileURL, format: recordingFormat)
 
-            // El tap se instala una vez y sigue a la petición vigente vía requestBox.
-            let tapBlock = Self.makeAudioTapBlock(requestBox: requestBox)
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat, block: tapBlock)
+            inputNode.removeTap(onBus: 0)
+            let writer = self.fileWriter
+            inputNode.installTap(onBus: 0, bufferSize: 2048, format: recordingFormat) { buffer, _ in
+                writer.write(buffer: buffer)
+            }
 
             audioEngine.prepare()
             try audioEngine.start()
 
-            self.isRecording = true
-            startTimer()
-            beginRecognitionTask(recognizer: recognizer)
+            self.phase = .recording
+            self.recordingDuration = 0
+            startDurationTimer()
         } catch {
-            self.errorMessage = String(localized: "No se pudo inicializar la captura de audio: \(error.localizedDescription)")
-            stopRecordingInternal()
+            self.errorMessage = error.localizedDescription
+            self.phase = .error(error.localizedDescription)
+            cleanupTempFile()
         }
     }
 
-    /// Detiene la grabación y finaliza la sesión de transcripción.
+    /// Detiene la grabación del micrófono y cierra el archivo temporal.
     public func stopRecording() {
         guard isRecording else { return }
-        isStopping = true
-        commitPartialIfNeeded()
-        publishTranscript()
-        stopRecordingInternal()
+
+        stopDurationTimer()
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        fileWriter.finish()
+
+        self.phase = .idle
     }
 
-    private func handleRecognitionUpdate(text: String?, isFinal: Bool, error: Error?, generation: UInt64) {
-        guard generation == recognitionGeneration, isRecording, !isStopping else { return }
-
-        if let text {
-            currentPartial = text
-            publishTranscript()
+    /// Transcribe el archivo previamente grabado utilizando transcripción offline on-device.
+    public func transcribeRecordedAudio() async throws -> String {
+        guard let fileURL = recordedFileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw NSError(domain: "PlanAI.Audio", code: 2, userInfo: [NSLocalizedDescriptionKey: "No hay ningún archivo de audio grabado para transcribir."])
         }
 
-        if let error {
-            let nsError = error as NSError
-            if Self.isRecoverableSpeechInterruption(nsError) {
-                commitPartialIfNeeded()
-                publishTranscript()
-                restartRecognition()
-                return
-            }
-            errorMessage = error.localizedDescription
-            commitPartialIfNeeded()
-            publishTranscript()
-            stopRecording()
-            return
-        }
+        self.phase = .transcribing
+        self.transcriptionProgress = 0.0
+        self.errorMessage = nil
 
-        if isFinal {
-            commitPartialIfNeeded()
-            publishTranscript()
-            restartRecognition()
-        }
-    }
+        let locale = selectedLocaleOption.locale
 
-    private func beginRecognitionTask(recognizer: SFSpeechRecognizer) {
-        recognitionGeneration += 1
-        let generation = recognitionGeneration
-
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        recognitionRequest?.endAudio()
-        recognitionRequest = nil
-
-        let request = Self.makeRecognitionRequest(supportsOnDevice: recognizer.supportsOnDeviceRecognition)
-        recognitionRequest = request
-        requestBox.update(request)
-
-        recognitionTask = recognizer.recognitionTask(
-            with: request,
-            resultHandler: Self.makeRecognitionHandler { [weak self] text, isFinal, error in
-                Task { @MainActor in
-                    self?.handleRecognitionUpdate(
-                        text: text,
-                        isFinal: isFinal,
-                        error: error,
-                        generation: generation
-                    )
+        let task = Task<String, Error> {
+            #if canImport(Speech)
+            if #available(macOS 26.0, *) {
+                if SpeechTranscriber.isAvailable,
+                   let resolvedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
+                    return try await self.transcribeWithSpeechTranscriber(fileURL: fileURL, locale: resolvedLocale)
                 }
             }
-        )
-    }
+            #endif
 
-    private func restartRecognition() {
-        guard isRecording, !isStopping else { return }
-        if let lastRestartAt, Date().timeIntervalSince(lastRestartAt) < 0.2, recognitionTask != nil {
-            return
-        }
-        lastRestartAt = Date()
-
-        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
-            errorMessage = String(localized: "El reconocedor de voz no está disponible para este idioma.")
-            stopRecording()
-            return
+            // Fallback robusto offline mediante SFSpeechURLRecognitionRequest
+            return try await self.transcribeWithSpeechURLRequest(fileURL: fileURL, locale: locale)
         }
 
-        beginRecognitionTask(recognizer: recognizer)
-    }
+        self.activeTranscriptionTask = task
 
-    private func commitPartialIfNeeded() {
-        let piece = currentPartial.trimmingCharacters(in: .whitespacesAndNewlines)
-        currentPartial = ""
-        guard !piece.isEmpty else { return }
-
-        if committedTranscript.isEmpty {
-            committedTranscript = piece
-            return
+        do {
+            let resultText = try await task.value
+            self.transcribedText = resultText
+            self.phase = .completed
+            self.transcriptionProgress = 1.0
+            cleanupTempFile()
+            return resultText
+        } catch is CancellationError {
+            self.phase = .idle
+            self.errorMessage = String(localized: "Transcripción cancelada.")
+            throw CancellationError()
+        } catch {
+            self.phase = .error(error.localizedDescription)
+            self.errorMessage = error.localizedDescription
+            throw error
         }
-
-        if committedTranscript.hasSuffix(piece) {
-            return
-        }
-
-        committedTranscript += " " + piece
     }
 
-    private func combinedTranscript() -> String {
-        let committed = committedTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-        let partial = currentPartial.trimmingCharacters(in: .whitespacesAndNewlines)
-        if committed.isEmpty { return partial }
-        if partial.isEmpty { return committed }
-        if committed.hasSuffix(partial) { return committed }
-        return committed + " " + partial
-    }
-
-    private func publishTranscript() {
-        let combined = combinedTranscript()
-        liveTranscript = combined
-        textAppendHandler?(combined)
-    }
-
-    private func stopRecordingInternal() {
-        recognitionGeneration += 1
-        isStopping = true
-        stopTimer()
-        isRecording = false
-        textAppendHandler = nil
-        requestBox.update(nil)
-
-        if audioEngine.isRunning {
+    /// Cancela cualquier transcripción en curso o grabación activa y restablece el estado.
+    public func cancel() {
+        if isRecording {
+            stopDurationTimer()
             audioEngine.stop()
             audioEngine.inputNode.removeTap(onBus: 0)
+            fileWriter.finish()
         }
-
-        recognitionRequest?.endAudio()
-        recognitionRequest = nil
-
-        recognitionTask?.cancel()
-        recognitionTask = nil
+        activeTranscriptionTask?.cancel()
+        activeTranscriptionTask = nil
+        cleanupTempFile()
+        self.phase = .idle
+        self.transcriptionProgress = 0.0
     }
 
-    private func startTimer() {
-        durationTimer?.invalidate()
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.recordingDuration += 1
+    /// Limpia el archivo temporal de grabación en disco.
+    public func cleanupTempFile() {
+        if let url = recordedFileURL {
+            try? FileManager.default.removeItem(at: url)
+            self.recordedFileURL = nil
+        }
+    }
+
+    // MARK: - Motores de Transcripción
+
+    #if canImport(Speech)
+    @available(macOS 26.0, *)
+    private func transcribeWithSpeechTranscriber(fileURL: URL, locale: Locale) async throws -> String {
+        var didReserve = false
+        do {
+            try await AssetInventory.reserve(locale: locale)
+            didReserve = true
+        } catch {
+            // Ya reservado o no requerido
+        }
+
+        defer {
+            if didReserve {
+                Task {
+                    await AssetInventory.release(reservedLocale: locale)
+                }
+            }
+        }
+
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: [.audioTimeRange]
+        )
+
+        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            try await request.downloadAndInstall()
+        }
+
+        try Task.checkCancellation()
+
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let audioFile = try AVAudioFile(forReading: fileURL)
+        let sampleRate = audioFile.processingFormat.sampleRate
+        let duration = sampleRate > 0 ? Double(audioFile.length) / sampleRate : 1.0
+
+        let resultsTask = Task<String, Error> {
+            var finalizedSegments: [String] = []
+            for try await result in transcriber.results {
+                try Task.checkCancellation()
+                let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+                if result.isFinal && !text.isEmpty {
+                    finalizedSegments.append(text)
+                }
+                let elapsed = result.range.end.seconds
+                if duration > 0 && elapsed.isFinite {
+                    let progress = min(0.95, max(0.05, elapsed / duration))
+                    await MainActor.run {
+                        self.transcriptionProgress = progress
+                    }
+                }
+            }
+            return finalizedSegments.joined(separator: " ")
+        }
+
+        let lastSampleTime = try await analyzer.analyzeSequence(from: audioFile)
+        if let lastSampleTime {
+            try await analyzer.finalizeAndFinish(through: lastSampleTime)
+        } else {
+            await analyzer.cancelAndFinishNow()
+        }
+
+        let result = try await resultsTask.value
+        return result
+    }
+    #endif
+
+    private func transcribeWithSpeechURLRequest(fileURL: URL, locale: Locale) async throws -> String {
+        guard let recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(locale: Locale(identifier: "es-ES")),
+              recognizer.isAvailable else {
+            throw NSError(domain: "PlanAI.Audio", code: 3, userInfo: [NSLocalizedDescriptionKey: "Reconocedor de voz no disponible para este idioma."])
+        }
+
+        let request = SFSpeechURLRecognitionRequest(url: fileURL)
+        request.requiresOnDeviceRecognition = true
+        request.shouldReportPartialResults = true
+
+        return try await withCheckedThrowingContinuation { continuation in
+            var hasResumed = false
+            var finalTranscript = ""
+
+            let task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                if let error = error {
+                    if !hasResumed {
+                        hasResumed = true
+                        continuation.resume(throwing: error)
+                    }
+                    return
+                }
+
+                guard let result = result else { return }
+                let current = result.bestTranscription.formattedString
+
+                Task { @MainActor in
+                    self?.transcriptionProgress = min(0.9, (self?.transcriptionProgress ?? 0.0) + 0.1)
+                }
+
+                if result.isFinal {
+                    finalTranscript = current
+                    if !hasResumed {
+                        hasResumed = true
+                        continuation.resume(returning: finalTranscript)
+                    }
+                }
+            }
+
+            // Timeout de seguridad de 60 segundos
+            Task {
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                if !hasResumed {
+                    hasResumed = true
+                    task.cancel()
+                    continuation.resume(returning: finalTranscript)
+                }
             }
         }
     }
 
-    private func stopTimer() {
+    // MARK: - Timers y Helpers
+
+    private func startDurationTimer() {
+        durationTimer?.invalidate()
+        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.recordingDuration += 0.1
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.durationTimer = timer
+    }
+
+    private func stopDurationTimer() {
         durationTimer?.invalidate()
         durationTimer = nil
     }
 
-    /// Formatea la duración transcurrida en mm:ss
     public var formattedDuration: String {
-        let minutes = Int(recordingDuration) / 60
-        let seconds = Int(recordingDuration) % 60
+        let totalSeconds = Int(recordingDuration)
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
-    }
-
-    private static func makeRecognitionRequest(supportsOnDevice: Bool) -> SFSpeechAudioBufferRecognitionRequest {
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        request.taskHint = .dictation
-        request.addsPunctuation = true
-        if supportsOnDevice {
-            request.requiresOnDeviceRecognition = true
-        }
-        return request
-    }
-
-    /// Timeouts de silencio, fin de segmento y límite ~1 min: se reinicia la tarea, no la grabación.
-    private static func isRecoverableSpeechInterruption(_ error: NSError) -> Bool {
-        if error.domain == "kAFAssistantErrorDomain" {
-            switch error.code {
-            case 203, 209, 216, 1101, 1110:
-                return true
-            default:
-                return false
-            }
-        }
-        return false
-    }
-
-    /// Cierre de tap sin aislamiento MainActor: Core Audio lo llama en un hilo de tiempo real.
-    nonisolated private static func makeAudioTapBlock(
-        requestBox: RecognitionRequestBox
-    ) -> AVAudioNodeTapBlock {
-        { buffer, _ in
-            requestBox.append(buffer)
-        }
-    }
-
-    /// Cierre de Speech sin aislamiento MainActor: el framework lo llama en una cola de fondo.
-    nonisolated private static func makeRecognitionHandler(
-        onUpdate: @escaping @Sendable (String?, Bool, Error?) -> Void
-    ) -> (SFSpeechRecognitionResult?, Error?) -> Void {
-        { result, error in
-            onUpdate(
-                result?.bestTranscription.formattedString,
-                result?.isFinal == true,
-                error
-            )
-        }
     }
 }
