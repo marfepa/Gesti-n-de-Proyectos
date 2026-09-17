@@ -69,6 +69,7 @@ public final class ProjectViewModel {
                     startDate: payload.startDate,
                     endDate: payload.endDate,
                     estimatedDays: payload.estimatedDays,
+                    estimatedHours: payload.estimatedHours,
                     isCompleted: false,
                     sortOrder: payload.sortOrder,
                     project: project
@@ -80,6 +81,7 @@ public final class ProjectViewModel {
                 for (subIdx, sub) in payload.subtasks.enumerated() {
                     let subtask = ProjectSubtask(
                         title: sub.title,
+                        notes: sub.notes,
                         estimatedHours: sub.hours,
                         sortOrder: subIdx,
                         task: task
@@ -232,6 +234,7 @@ public final class ProjectViewModel {
         for (idx, item) in generated.enumerated() {
             let subtask = ProjectSubtask(
                 title: item.title,
+                notes: item.notes,
                 estimatedHours: item.hours,
                 sortOrder: (task.subtasks.map(\.sortOrder).max() ?? -1) + 1 + idx,
                 task: task
