@@ -52,6 +52,7 @@ public final class AudioTranscriptionService {
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
     private var durationTimer: Timer?
+    private var textAppendHandler: (@MainActor (String) -> Void)?
 
     public init() {
         setupRecognizer()
@@ -128,11 +129,11 @@ public final class AudioTranscriptionService {
         let permissionsOk = await requestPermissions()
         guard permissionsOk else { return }
 
-        // Limpiar estado previo
         errorMessage = nil
         liveTranscript = ""
         recordingDuration = 0
         stopRecordingInternal()
+        textAppendHandler = onAppendText
 
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             self.errorMessage = String(localized: "El reconocedor de voz no está disponible para este idioma.")
@@ -159,11 +160,10 @@ public final class AudioTranscriptionService {
 
             inputNode.removeTap(onBus: 0)
 
-            // Captura local del request para desacoplar el hilo de CoreAudio de la clase @MainActor
-            let activeRequest = request
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-                activeRequest.append(buffer)
-            }
+            // El tap y el handler de Speech se construyen fuera de @MainActor:
+            // Core Audio y Speech los invocan en colas concurrentes.
+            let tapBlock = Self.makeAudioTapBlock(request: request)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat, block: tapBlock)
 
             audioEngine.prepare()
             try audioEngine.start()
@@ -171,34 +171,14 @@ public final class AudioTranscriptionService {
             self.isRecording = true
             startTimer()
 
-            // Despacho inequívoco en DispatchQueue.main para todos los resultados del recognitionTask
-            self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-                let formattedText = result?.bestTranscription.formattedString
-                let isFinal = result?.isFinal == true
-                let taskError = error
-
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-
-                    if let text = formattedText {
-                        self.liveTranscript = text
-                        onAppendText(text)
-                    }
-
-                    if let err = taskError {
-                        let nsError = err as NSError
-                        if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 {
-                            self.errorMessage = err.localizedDescription
-                        }
-                        self.stopRecording()
-                        return
-                    }
-
-                    if isFinal {
-                        self.stopRecording()
+            self.recognitionTask = recognizer.recognitionTask(
+                with: request,
+                resultHandler: Self.makeRecognitionHandler { [weak self] text, isFinal, error in
+                    Task { @MainActor in
+                        self?.handleRecognitionUpdate(text: text, isFinal: isFinal, error: error)
                     }
                 }
-            }
+            )
         } catch {
             self.errorMessage = String(localized: "No se pudo inicializar la captura de audio: \(error.localizedDescription)")
             stopRecordingInternal()
@@ -211,9 +191,30 @@ public final class AudioTranscriptionService {
         stopRecordingInternal()
     }
 
+    private func handleRecognitionUpdate(text: String?, isFinal: Bool, error: Error?) {
+        if let text {
+            liveTranscript = text
+            textAppendHandler?(text)
+        }
+
+        if let error {
+            let nsError = error as NSError
+            if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 {
+                errorMessage = error.localizedDescription
+            }
+            stopRecording()
+            return
+        }
+
+        if isFinal {
+            stopRecording()
+        }
+    }
+
     private func stopRecordingInternal() {
         stopTimer()
         isRecording = false
+        textAppendHandler = nil
 
         if audioEngine.isRunning {
             audioEngine.stop()
@@ -230,7 +231,7 @@ public final class AudioTranscriptionService {
     private func startTimer() {
         durationTimer?.invalidate()
         durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self?.recordingDuration += 1
             }
         }
@@ -246,5 +247,27 @@ public final class AudioTranscriptionService {
         let minutes = Int(recordingDuration) / 60
         let seconds = Int(recordingDuration) % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    /// Cierre de tap sin aislamiento MainActor: Core Audio lo llama en un hilo de tiempo real.
+    nonisolated private static func makeAudioTapBlock(
+        request: SFSpeechAudioBufferRecognitionRequest
+    ) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            request.append(buffer)
+        }
+    }
+
+    /// Cierre de Speech sin aislamiento MainActor: el framework lo llama en una cola de fondo.
+    nonisolated private static func makeRecognitionHandler(
+        onUpdate: @escaping @Sendable (String?, Bool, Error?) -> Void
+    ) -> (SFSpeechRecognitionResult?, Error?) -> Void {
+        { result, error in
+            onUpdate(
+                result?.bestTranscription.formattedString,
+                result?.isFinal == true,
+                error
+            )
+        }
     }
 }
