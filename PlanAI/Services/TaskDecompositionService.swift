@@ -55,17 +55,31 @@ public final class TaskDecompositionService: Sendable {
             let instructions = """
                 Eres un gestor de proyectos senior con 20 años de experiencia estimando software y proyectos creativos.
 
+                LEY DE PARKINSON - PRINCIPIO FUNDAMENTAL:
+                - "El trabajo se expande hasta llenar el tiempo disponible para su realización."
+                - Por lo tanto, SIEMPRE estima el tiempo MÍNIMO realista necesario, no el cómodo.
+                - Si una tarea "podría" hacerse en 4 horas pero "cómodamente" en 8, estima 4-5 horas.
+                - Prefiere estimaciones ajustadas pero realistas. Mejor quedarse ligeramente corto que largo.
+                - Las personas rinden mejor con plazos ajustados que con plazos holgados.
+                - Aplica un factor de reducción del 30% sobre tu primera estimación instintiva.
+
+                FILOSOFÍA ESTOICA - UNA TAREA PARA CADA MOMENTO (MONOTAREA ABSOLUTA):
+                - En cada momento o franja horaria existe foco exclusivo en una única tarea.
+                - No se dispersa la atención en multitarea ni se intercalan tareas en el mismo intervalo.
+                - Las tareas y subtareas deben estructurarse de forma estrictamente secuencial y autocontenida: una cosa se empieza y se termina por completo antes de pasar a la siguiente fase o tema.
+                - Delimita claramente el final de cada tarea para permitir un cierre completo e impecable antes de cualquier transición.
+
                 REGLAS CRÍTICAS DE ESTIMACIÓN:
                 - Estima en HORAS de trabajo efectivo, no en días completos.
                 - Una reunión de kickoff típica dura 1-2 horas, no un día.
-                - Configurar un entorno de desarrollo toma 2-4 horas, no días.
-                - Escribir un documento de requisitos de 2-3 páginas toma 3-6 horas.
-                - Un diseño de UI sencillo (5-10 pantallas) toma 8-16 horas.
-                - Implementar un CRUD básico toma 4-8 horas.
-                - Implementar autenticación con un framework existente toma 4-8 horas.
-                - Escribir tests unitarios para un módulo pequeño toma 2-4 horas.
-                - Una revisión de código detallada toma 1-3 horas.
-                - NO infles estimaciones "por si acaso". Sé realista y ajustado.
+                - Configurar un entorno de desarrollo toma 1-2 horas, no días.
+                - Escribir un documento de requisitos de 2-3 páginas toma 2-4 horas.
+                - Un diseño de UI sencillo (5-10 pantallas) toma 6-10 horas.
+                - Implementar un CRUD básico toma 3-6 horas.
+                - Implementar autenticación con un framework existente toma 3-6 horas.
+                - Escribir tests unitarios para un módulo pequeño toma 1-3 horas.
+                - Una revisión de código detallada toma 1-2 horas.
+                - NO infles estimaciones "por si acaso". Sé agresivo pero realista.
                 - Si una fase entera dura menos de 4 horas, NO la dividas en más de 2 subtareas.
                 - Tareas muy cortas (< 1 hora) pueden no necesitar subtareas.
 
@@ -83,7 +97,8 @@ public final class TaskDecompositionService: Sendable {
 
             let prompt = """
                 Desglosa este proyecto en fases de trabajo secuenciales con subtareas detalladas.
-                Estima las horas de trabajo efectivo de manera realista y ajustada.
+                Estima las horas de trabajo efectivo de manera ajustada y ambiciosa.
+                Recuerda: aplica la Ley de Parkinson (mínimo tiempo viable) y el Principio Estoico de una tarea para cada momento (foco único y secuencial sin multitarea).
 
                 Descripción del proyecto:
                 \(trimmed)
@@ -224,52 +239,52 @@ public final class TaskDecompositionService: Sendable {
                 ))
             }
         } else {
-            // Fases estándar calibradas en horas realistas con subtareas accionables
+            // Fases estándar calibradas en horas realistas con subtareas accionables (Ley de Parkinson: mínimo viable)
             subtasks = [
                 SubtaskPlan(
                     title: "Análisis de Requisitos y Alcance",
-                    estimatedHours: 6.0,
+                    estimatedHours: 4.0,
                     notes: "Definición concisa de especificaciones técnicas y criterios de aceptación.",
                     subtaskDetails: [
-                        SubtaskDetailPlan(title: "Entrevistas de requerimientos y casos de uso", estimatedHours: 3.0, notes: "Identificar requerimientos funcionales críticos y restricciones."),
-                        SubtaskDetailPlan(title: "Documentación de especificación técnica", estimatedHours: 3.0, notes: "Redactar documento de 2-3 páginas con criterios de aceptación.")
+                        SubtaskDetailPlan(title: "Entrevistas de requerimientos y casos de uso", estimatedHours: 2.0, notes: "Identificar requerimientos funcionales críticos y restricciones."),
+                        SubtaskDetailPlan(title: "Documentación de especificación técnica", estimatedHours: 2.0, notes: "Redactar documento de 2-3 páginas con criterios de aceptación.")
                     ]
                 ),
                 SubtaskPlan(
                     title: "Diseño y Arquitectura",
-                    estimatedHours: 8.0,
+                    estimatedHours: 5.0,
                     notes: "Estructuración de componentes, modelos de datos y wireframes.",
                     subtaskDetails: [
-                        SubtaskDetailPlan(title: "Diseño de wireframes en Figma", estimatedHours: 4.0, notes: "Crear flujos visuales principales con estados vacío, activo y error."),
-                        SubtaskDetailPlan(title: "Definición del modelo de datos y contratos de API", estimatedHours: 4.0, notes: "Estructurar esquemas SwiftData / endpoints.")
+                        SubtaskDetailPlan(title: "Diseño de wireframes en Figma", estimatedHours: 3.0, notes: "Crear flujos visuales principales con estados vacío, activo y error."),
+                        SubtaskDetailPlan(title: "Definición del modelo de datos y contratos de API", estimatedHours: 2.0, notes: "Estructurar esquemas SwiftData / endpoints.")
                     ]
                 ),
                 SubtaskPlan(
                     title: "Implementación Core",
-                    estimatedHours: 16.0,
+                    estimatedHours: 10.0,
                     notes: "Desarrollo de las funcionalidades críticas del proyecto.",
                     subtaskDetails: [
-                        SubtaskDetailPlan(title: "Configuración de servicios base e inyección", estimatedHours: 4.0, notes: "Estructurar infraestructura y modelos persistentes."),
-                        SubtaskDetailPlan(title: "Desarrollo de pantallas principales y vistas SwiftUI", estimatedHours: 8.0, notes: "Construcción interactiva de los componentes de UI."),
-                        SubtaskDetailPlan(title: "Integración de lógica de negocio y persistencia", estimatedHours: 4.0, notes: "Conectar viewmodels con modelos y validaciones.")
+                        SubtaskDetailPlan(title: "Configuración de servicios base e inyección", estimatedHours: 2.0, notes: "Estructurar infraestructura y modelos persistentes."),
+                        SubtaskDetailPlan(title: "Desarrollo de pantallas principales y vistas SwiftUI", estimatedHours: 5.0, notes: "Construcción interactiva de los componentes de UI."),
+                        SubtaskDetailPlan(title: "Integración de lógica de negocio y persistencia", estimatedHours: 3.0, notes: "Conectar viewmodels con modelos y validaciones.")
                     ]
                 ),
                 SubtaskPlan(
                     title: "Pruebas y Verificación",
-                    estimatedHours: 6.0,
+                    estimatedHours: 4.0,
                     notes: "Validación de calidad, cobertura de pruebas unitarias y corrección de errores.",
                     subtaskDetails: [
-                        SubtaskDetailPlan(title: "Creación de suite de tests unitarios", estimatedHours: 3.0, notes: "Cobertura de casos límite y regresiones críticas."),
-                        SubtaskDetailPlan(title: "Pruebas de interfaz y pulido de casos extremos", estimatedHours: 3.0, notes: "Validar rendimiento, accesibilidad y estados de error.")
+                        SubtaskDetailPlan(title: "Creación de suite de tests unitarios", estimatedHours: 2.0, notes: "Cobertura de casos límite y regresiones críticas."),
+                        SubtaskDetailPlan(title: "Pruebas de interfaz y pulido de casos extremos", estimatedHours: 2.0, notes: "Validar rendimiento, accesibilidad y estados de error.")
                     ]
                 ),
                 SubtaskPlan(
                     title: "Despliegue y Cierre",
-                    estimatedHours: 4.0,
+                    estimatedHours: 3.0,
                     notes: "Generación de artefactos de entrega y documentación final.",
                     subtaskDetails: [
-                        SubtaskDetailPlan(title: "Configuración de compilación y empaquetado", estimatedHours: 2.0, notes: "Verificar esquema de release y firmas."),
-                        SubtaskDetailPlan(title: "Documentación de entrega y guía de usuario", estimatedHours: 2.0, notes: "Manual de usuario y changelog.")
+                        SubtaskDetailPlan(title: "Configuración de compilación y empaquetado", estimatedHours: 1.5, notes: "Verificar esquema de release y firmas."),
+                        SubtaskDetailPlan(title: "Documentación de entrega y guía de usuario", estimatedHours: 1.5, notes: "Manual de usuario y changelog.")
                     ]
                 )
             ]

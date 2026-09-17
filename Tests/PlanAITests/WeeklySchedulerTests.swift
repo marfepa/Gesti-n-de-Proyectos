@@ -263,11 +263,13 @@ final class WeeklySchedulerTests: XCTestCase {
         parentTask.subtasks = [sub1, sub2]
         project.tasks = [parentTask]
 
-        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 15 * 60)
+        // 2 slots separados: Lunes 9:00-11:00 y Lunes 11:00-13:00 (Principio Estoico: 1 tarea/subtarea por franja)
+        let slot1 = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 11 * 60)
+        let slot2 = WorkSlot(weekday: 2, startMinute: 11 * 60, endMinute: 13 * 60)
 
         let result = service.schedule(
             projects: [project],
-            slots: [slot],
+            slots: [slot1, slot2],
             startDate: refDate,
             weeksToSchedule: 1,
             safetyBufferPercent: 0.0,
@@ -279,8 +281,10 @@ final class WeeklySchedulerTests: XCTestCase {
         XCTAssertEqual(result.scheduledItems.count, 2)
         XCTAssertEqual(result.scheduledItems[0].subtaskTitle, "Sub 1")
         XCTAssertEqual(result.scheduledItems[0].allocatedHours, 1.5)
+        XCTAssertEqual(result.scheduledItems[0].startMinute, 9 * 60)
         XCTAssertEqual(result.scheduledItems[1].subtaskTitle, "Sub 2")
         XCTAssertEqual(result.scheduledItems[1].allocatedHours, 1.5)
+        XCTAssertEqual(result.scheduledItems[1].startMinute, 11 * 60)
     }
 
     func testDynamicSlotReallocationWhenTaskCompletedEarly() {
@@ -336,7 +340,38 @@ final class WeeklySchedulerTests: XCTestCase {
         XCTAssertTrue(reallocatedResult.unscheduledTasks.isEmpty)
     }
 
-    func testMultiProjectContinuousPackingOptimizesAvailableSlots() {
+    func testStoicSingleTaskPerSlotEnforcesExclusivityAndNoMixing() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
+
+        // Dos tareas del mismo proyecto
+        let p = Project(name: "Proyecto Monotarea", startDate: refDate, priority: .alta)
+        let t1 = ProjectTask(title: "Tarea 1 (Corta)", startDate: refDate, endDate: refDate, estimatedHours: 1.0, sortOrder: 0, project: p)
+        let t2 = ProjectTask(title: "Tarea 2 (Corta)", startDate: refDate, endDate: refDate, estimatedHours: 1.0, sortOrder: 1, project: p)
+        p.tasks = [t1, t2]
+
+        // Solo 1 franja horaria amplia de 4 horas (9:00 a 13:00)
+        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 13 * 60)
+
+        let result = service.schedule(
+            projects: [p],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        // Principio Estoico: En la franja solo debe haber una única tarea.
+        // Tarea 1 toma la franja y Tarea 2 NO puede entrar en esa misma franja aunque sobre tiempo.
+        XCTAssertEqual(result.scheduledItems.count, 1)
+        XCTAssertEqual(result.scheduledItems[0].taskTitle, "Tarea 1 (Corta)")
+        XCTAssertEqual(result.scheduledItems[0].allocatedHours, 1.0)
+        XCTAssertEqual(result.unscheduledTasks.count, 1)
+        XCTAssertEqual(result.unscheduledTasks[0].taskTitle, "Tarea 2 (Corta)")
+    }
+
+    func testStoicMultiProjectDispatchesAcrossDistinctSlots() {
         let service = WeeklySchedulerService()
         let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
 
@@ -355,36 +390,41 @@ final class WeeklySchedulerTests: XCTestCase {
         let t3 = ProjectTask(title: "Task 3", startDate: refDate, endDate: refDate, estimatedHours: 0.5, project: p3)
         p3.tasks = [t3]
 
-        // Bloque de 4 horas exactas (9:00 - 13:00)
-        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 13 * 60)
+        // 3 franjas horarias distintas (una para cada momento):
+        // Franja 1: 9:00 - 11:00 (2h)
+        // Franja 2: 11:00 - 13:00 (2h)
+        // Franja 3: 15:00 - 16:00 (1h)
+        let slot1 = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 11 * 60)
+        let slot2 = WorkSlot(weekday: 2, startMinute: 11 * 60, endMinute: 13 * 60)
+        let slot3 = WorkSlot(weekday: 2, startMinute: 15 * 60, endMinute: 16 * 60)
 
         let result = service.schedule(
             projects: [p3, p1, p2], // Desordenados
-            slots: [slot],
+            slots: [slot1, slot2, slot3],
             startDate: refDate,
             weeksToSchedule: 1,
             safetyBufferPercent: 0.0,
             calendar: calendar
         )
 
-        // Comprobación de empaquetado continuo óptimo
-        XCTAssertEqual(result.totalAllocatedHours, 4.0)
-        XCTAssertEqual(result.slotUtilization, 1.0)
+        // Cada tarea se asigna en su respectiva franja horaria separada por orden de prioridad
+        XCTAssertEqual(result.scheduledItems.count, 3)
         XCTAssertTrue(result.unscheduledTasks.isEmpty)
 
-        // Las tareas deben ordenarse por prioridad: P1 (alta), luego P2 (media), luego P3 (baja)
-        XCTAssertEqual(result.scheduledItems.count, 3)
+        // P1 en Franja 1 (9:00 - 10:30)
         XCTAssertEqual(result.scheduledItems[0].projectName, "P1")
         XCTAssertEqual(result.scheduledItems[0].startMinute, 9 * 60)
-        XCTAssertEqual(result.scheduledItems[0].endMinute, 9 * 60 + 90) // 9:00 - 10:30
+        XCTAssertEqual(result.scheduledItems[0].endMinute, 9 * 60 + 90)
 
+        // P2 en Franja 2 (11:00 - 13:00)
         XCTAssertEqual(result.scheduledItems[1].projectName, "P2")
-        XCTAssertEqual(result.scheduledItems[1].startMinute, 9 * 60 + 90) // 10:30
-        XCTAssertEqual(result.scheduledItems[1].endMinute, 9 * 60 + 210) // 10:30 - 12:30
+        XCTAssertEqual(result.scheduledItems[1].startMinute, 11 * 60)
+        XCTAssertEqual(result.scheduledItems[1].endMinute, 13 * 60)
 
+        // P3 en Franja 3 (15:00 - 15:30)
         XCTAssertEqual(result.scheduledItems[2].projectName, "P3")
-        XCTAssertEqual(result.scheduledItems[2].startMinute, 9 * 60 + 210) // 12:30
-        XCTAssertEqual(result.scheduledItems[2].endMinute, 13 * 60) // 12:30 - 13:00
+        XCTAssertEqual(result.scheduledItems[2].startMinute, 15 * 60)
+        XCTAssertEqual(result.scheduledItems[2].endMinute, 15 * 60 + 30)
     }
 
     func testParallelColumnsLayoutAvoidsOverlaps() {

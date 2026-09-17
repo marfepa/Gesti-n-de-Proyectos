@@ -281,7 +281,10 @@ public final class WeeklySchedulerService: Sendable {
             }
         }
 
-        // 3. Asignación determinista y empaquetado continuo (packing)
+        // 3. Asignación determinista con Principio Estoico Monotarea (Una sola tarea por franja horaria)
+        // Regla: En cada franja horaria solo se asigna una única tarea.
+        // Si la tarea finaliza antes del fin de la franja, no se introduce ninguna otra tarea en esa misma franja.
+        // Si la tarea requiere más tiempo del disponible en la franja, consume la franja y continúa en la siguiente franja.
         var scheduledItems: [ScheduledItem] = []
         var totalAllocatedHours: Double = 0.0
         var slotIndex = 0
@@ -325,9 +328,10 @@ public final class WeeklySchedulerService: Sendable {
                 concreteSlots[slotIndex] = currentSlot
                 totalAllocatedHours += assignedHours
 
-                if currentSlot.remainingMinutes <= 0 {
-                    slotIndex += 1
-                }
+                // Principio Estoico: Foco exclusivo en una única tarea por franja.
+                // Ya sea que la tarea haya consumido todos los minutos de la franja o haya finalizado sus horas,
+                // la franja actual queda cerrada para cualquier otra tarea subsiguiente.
+                slotIndex += 1
             }
         }
 
