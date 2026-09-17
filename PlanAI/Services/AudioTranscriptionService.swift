@@ -80,27 +80,42 @@ public final class AudioTranscriptionService {
         }
     }
 
-    /// Solicita permisos de Micrófono y Reconocimiento de Voz a macOS.
+    /// Solicita permisos de Micrófono y Reconocimiento de Voz a macOS garantizando ejecución en la cola principal.
     public func requestPermissions() async -> Bool {
-        let speechAuthorized = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status == .authorized)
+        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+        let speechGranted: Bool
+
+        if speechStatus == .notDetermined {
+            speechGranted = await withCheckedContinuation { continuation in
+                DispatchQueue.main.async {
+                    SFSpeechRecognizer.requestAuthorization { status in
+                        DispatchQueue.main.async {
+                            continuation.resume(returning: status == .authorized)
+                        }
+                    }
+                }
             }
+        } else {
+            speechGranted = (speechStatus == .authorized)
         }
 
-        let micAuthorized: Bool
+        let micGranted: Bool
         if #available(macOS 14.0, *) {
-            micAuthorized = await AVAudioApplication.requestRecordPermission()
+            micGranted = await AVAudioApplication.requestRecordPermission()
         } else {
-            micAuthorized = await withCheckedContinuation { continuation in
-                AVCaptureDevice.requestAccess(for: .audio) { granted in
-                    continuation.resume(returning: granted)
+            micGranted = await withCheckedContinuation { continuation in
+                DispatchQueue.main.async {
+                    AVCaptureDevice.requestAccess(for: .audio) { granted in
+                        DispatchQueue.main.async {
+                            continuation.resume(returning: granted)
+                        }
+                    }
                 }
             }
         }
 
-        self.isAuthorized = speechAuthorized && micAuthorized
-        if !speechAuthorized || !micAuthorized {
+        self.isAuthorized = speechGranted && micGranted
+        if !self.isAuthorized {
             self.errorMessage = String(localized: "Se requieren permisos de Micrófono y Reconocimiento de Voz para dictar.")
         }
         return self.isAuthorized
@@ -128,7 +143,6 @@ public final class AudioTranscriptionService {
             let request = SFSpeechAudioBufferRecognitionRequest()
             request.shouldReportPartialResults = true
 
-            // Preferir reconocimiento on-device si el hardware y la locale lo soportan
             if recognizer.supportsOnDeviceRecognition {
                 request.requiresOnDeviceRecognition = true
             }
@@ -138,14 +152,17 @@ public final class AudioTranscriptionService {
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-            guard recordingFormat.sampleRate > 0 else {
+            guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
                 self.errorMessage = String(localized: "No se detectó un dispositivo de entrada de audio válido.")
                 return
             }
 
             inputNode.removeTap(onBus: 0)
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-                self?.recognitionRequest?.append(buffer)
+
+            // Captura local del request para desacoplar el hilo de CoreAudio de la clase @MainActor
+            let activeRequest = request
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+                activeRequest.append(buffer)
             }
 
             audioEngine.prepare()
@@ -154,13 +171,13 @@ public final class AudioTranscriptionService {
             self.isRecording = true
             startTimer()
 
-            // Despacho seguro en MainActor para todos los resultados y errores del reconocimiento
+            // Despacho inequívoco en DispatchQueue.main para todos los resultados del recognitionTask
             self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                 let formattedText = result?.bestTranscription.formattedString
                 let isFinal = result?.isFinal == true
                 let taskError = error
 
-                Task { @MainActor [weak self] in
+                DispatchQueue.main.async {
                     guard let self = self else { return }
 
                     if let text = formattedText {
@@ -170,7 +187,6 @@ public final class AudioTranscriptionService {
 
                     if let err = taskError {
                         let nsError = err as NSError
-                        // Ignorar cancelación normal solicitada por el usuario
                         if nsError.domain != "kAFAssistantErrorDomain" || nsError.code != 203 {
                             self.errorMessage = err.localizedDescription
                         }
@@ -214,7 +230,7 @@ public final class AudioTranscriptionService {
     private func startTimer() {
         durationTimer?.invalidate()
         durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            DispatchQueue.main.async {
                 self?.recordingDuration += 1
             }
         }
