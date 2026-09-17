@@ -42,6 +42,17 @@ public struct ContentView: View {
                                             .foregroundStyle(viewModel.activeTab == .projects && viewModel.selectedProject?.id == project.id ? .blue : .primary)
 
                                         HStack(spacing: 8) {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: project.priority.iconName)
+                                                Text(project.priority.title)
+                                            }
+                                            .font(.caption2)
+                                            .foregroundStyle(priorityColor(project.priority))
+
+                                            Text("•")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+
                                             Text("\(project.tasks.count) " + String(localized: "tareas"))
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
@@ -119,6 +130,15 @@ public struct ContentView: View {
         for index in offsets {
             let project = projects[index]
             viewModel.deleteProject(project, context: modelContext)
+        }
+    }
+
+    private func priorityColor(_ priority: ProjectPriority) -> Color {
+        switch priority {
+        case .baja: return .secondary
+        case .media: return .blue
+        case .alta: return .orange
+        case .urgente: return .red
         }
     }
 }

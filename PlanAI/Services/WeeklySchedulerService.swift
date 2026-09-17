@@ -4,8 +4,12 @@ import Foundation
 public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public var id: UUID
     public var taskId: UUID
+    public var projectId: UUID?
+    public var subtaskId: UUID?
     public var taskTitle: String
+    public var subtaskTitle: String?
     public var projectName: String
+    public var projectPriority: ProjectPriority
     public var date: Date
     public var startMinute: Int
     public var endMinute: Int
@@ -15,8 +19,12 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public init(
         id: UUID = UUID(),
         taskId: UUID,
+        projectId: UUID? = nil,
+        subtaskId: UUID? = nil,
         taskTitle: String,
+        subtaskTitle: String? = nil,
         projectName: String,
+        projectPriority: ProjectPriority = .media,
         date: Date,
         startMinute: Int,
         endMinute: Int,
@@ -25,13 +33,24 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
     ) {
         self.id = id
         self.taskId = taskId
+        self.projectId = projectId
+        self.subtaskId = subtaskId
         self.taskTitle = taskTitle
+        self.subtaskTitle = subtaskTitle
         self.projectName = projectName
+        self.projectPriority = projectPriority
         self.date = date
         self.startMinute = startMinute
         self.endMinute = endMinute
         self.allocatedHours = allocatedHours
         self.isCompleted = isCompleted
+    }
+
+    public var displayTitle: String {
+        if let sub = subtaskTitle, !sub.isEmpty {
+            return "\(taskTitle) › \(sub)"
+        }
+        return taskTitle
     }
 
     public var timeRangeFormatted: String {
@@ -46,13 +65,22 @@ public struct UnscheduledTaskInfo: Identifiable, Sendable, Equatable {
     public var id: UUID
     public var taskTitle: String
     public var projectName: String
+    public var projectPriority: ProjectPriority
     public var remainingHours: Double
     public var reason: String
 
-    public init(id: UUID, taskTitle: String, projectName: String, remainingHours: Double, reason: String) {
+    public init(
+        id: UUID,
+        taskTitle: String,
+        projectName: String,
+        projectPriority: ProjectPriority = .media,
+        remainingHours: Double,
+        reason: String
+    ) {
         self.id = id
         self.taskTitle = taskTitle
         self.projectName = projectName
+        self.projectPriority = projectPriority
         self.remainingHours = remainingHours
         self.reason = reason
     }
@@ -73,6 +101,12 @@ public struct ScheduleResult: Sendable, Equatable {
 
     public var deficitHours: Double {
         max(0, totalDemandHours - totalAllocatedHours)
+    }
+
+    /// Porcentaje de aprovechamiento de los momentos disponibles (0.0 a 1.0).
+    public var slotUtilization: Double {
+        guard totalAvailableHours > 0 else { return 0.0 }
+        return min(1.0, totalAllocatedHours / totalAvailableHours)
     }
 }
 
@@ -98,12 +132,16 @@ public final class WeeklySchedulerService: Sendable {
     ) -> ScheduleResult {
         let enabledSlots = slots.filter { $0.isEnabled && $0.durationMinutes > 0 }
         
-        // 1. Recopilar tareas pendientes de proyectos activos ordenadas según criterio seguro (EDF + Fase)
+        // 1. Recopilar unidades de trabajo pendientes de proyectos activos ordenadas según criterio seguro (Prioridad + EDF + Fase + Subtarea)
         struct TaskCandidate {
             let task: ProjectTask
+            let subtask: ProjectSubtask?
+            let projectId: UUID
             let projectName: String
+            let projectPriority: ProjectPriority
             let projectDeadline: Date
-            let sortOrder: Int
+            let taskSortOrder: Int
+            let subtaskSortOrder: Int
             var remainingHours: Double
         }
 
@@ -111,32 +149,73 @@ public final class WeeklySchedulerService: Sendable {
         var totalDemand: Double = 0.0
 
         for project in projects {
+            // Filtrar solo tareas no completadas
             let pendingTasks = project.sortedTasks.filter { !$0.isCompleted }
-            let deadline = project.estimatedEndDate
+            let deadline = project.effectiveDeadline
+            let priority = project.priority
+
             for task in pendingTasks {
-                let hours = max(0.5, task.estimatedHours)
-                totalDemand += hours
-                candidates.append(
-                    TaskCandidate(
-                        task: task,
-                        projectName: project.name,
-                        projectDeadline: deadline,
-                        sortOrder: task.sortOrder,
-                        remainingHours: hours
+                // Si la tarea tiene subtareas, despachar a nivel de subtareas pendientes
+                let pendingSubtasks = task.sortedSubtasks.filter { !$0.isCompleted }
+                if !pendingSubtasks.isEmpty {
+                    for sub in pendingSubtasks {
+                        let hours = max(0.25, sub.estimatedHours)
+                        totalDemand += hours
+                        candidates.append(
+                            TaskCandidate(
+                                task: task,
+                                subtask: sub,
+                                projectId: project.id,
+                                projectName: project.name,
+                                projectPriority: priority,
+                                projectDeadline: deadline,
+                                taskSortOrder: task.sortOrder,
+                                subtaskSortOrder: sub.sortOrder,
+                                remainingHours: hours
+                            )
+                        )
+                    }
+                } else {
+                    // Si no tiene subtareas (o todas completadas pero la tarea no), despachar la tarea completa
+                    let hours = max(0.5, task.effectiveEstimatedHours)
+                    totalDemand += hours
+                    candidates.append(
+                        TaskCandidate(
+                            task: task,
+                            subtask: nil,
+                            projectId: project.id,
+                            projectName: project.name,
+                            projectPriority: priority,
+                            projectDeadline: deadline,
+                            taskSortOrder: task.sortOrder,
+                            subtaskSortOrder: 0,
+                            remainingHours: hours
+                        )
                     )
-                )
+                }
             }
         }
 
-        // Orden de prioridad: Earliest Deadline First (EDF) del proyecto, y dentro de cada proyecto el orden secuencial de la tarea
+        // Orden de prioridad para máxima optimización multiproyecto:
+        // 1. Prioridad del proyecto (urgente > alta > media > baja)
+        // 2. Earliest Deadline First (EDF) del proyecto
+        // 3. Nombre del proyecto (determinismo)
+        // 4. Orden de fase/tarea dentro del proyecto
+        // 5. Orden de subtarea
         candidates.sort { a, b in
+            if a.projectPriority != b.projectPriority {
+                return a.projectPriority.rawValue > b.projectPriority.rawValue
+            }
             if a.projectDeadline != b.projectDeadline {
                 return a.projectDeadline < b.projectDeadline
             }
             if a.projectName != b.projectName {
                 return a.projectName < b.projectName
             }
-            return a.sortOrder < b.sortOrder
+            if a.taskSortOrder != b.taskSortOrder {
+                return a.taskSortOrder < b.taskSortOrder
+            }
+            return a.subtaskSortOrder < b.subtaskSortOrder
         }
 
         guard !enabledSlots.isEmpty else {
@@ -144,9 +223,10 @@ public final class WeeklySchedulerService: Sendable {
                 scheduledItems: [],
                 unscheduledTasks: candidates.map {
                     UnscheduledTaskInfo(
-                        id: $0.task.id,
-                        taskTitle: $0.task.title,
+                        id: $0.subtask?.id ?? $0.task.id,
+                        taskTitle: $0.subtask != nil ? "\($0.task.title) › \($0.subtask!.title)" : $0.task.title,
                         projectName: $0.projectName,
+                        projectPriority: $0.projectPriority,
                         remainingHours: $0.remainingHours,
                         reason: "No hay momentos disponibles configurados o habilitados."
                     )
@@ -201,7 +281,7 @@ public final class WeeklySchedulerService: Sendable {
             }
         }
 
-        // 3. Asignación determinista a los huecos
+        // 3. Asignación determinista y empaquetado continuo (packing)
         var scheduledItems: [ScheduledItem] = []
         var totalAllocatedHours: Double = 0.0
         var slotIndex = 0
@@ -225,13 +305,17 @@ public final class WeeklySchedulerService: Sendable {
                 scheduledItems.append(
                     ScheduledItem(
                         taskId: candidates[candidateIndex].task.id,
+                        projectId: candidates[candidateIndex].projectId,
+                        subtaskId: candidates[candidateIndex].subtask?.id,
                         taskTitle: candidates[candidateIndex].task.title,
+                        subtaskTitle: candidates[candidateIndex].subtask?.title,
                         projectName: candidates[candidateIndex].projectName,
+                        projectPriority: candidates[candidateIndex].projectPriority,
                         date: currentSlot.date,
                         startMinute: startMin,
                         endMinute: endMin,
                         allocatedHours: assignedHours,
-                        isCompleted: candidates[candidateIndex].task.isCompleted
+                        isCompleted: candidates[candidateIndex].subtask?.isCompleted ?? candidates[candidateIndex].task.isCompleted
                     )
                 )
 
@@ -250,11 +334,13 @@ public final class WeeklySchedulerService: Sendable {
         // 4. Identificar tareas desbordadas que no pudieron completarse en el horizonte
         var unscheduled: [UnscheduledTaskInfo] = []
         for candidate in candidates where candidate.remainingHours > 0.05 {
+            let label = candidate.subtask != nil ? "\(candidate.task.title) › \(candidate.subtask!.title)" : candidate.task.title
             unscheduled.append(
                 UnscheduledTaskInfo(
-                    id: candidate.task.id,
-                    taskTitle: candidate.task.title,
+                    id: candidate.subtask?.id ?? candidate.task.id,
+                    taskTitle: label,
                     projectName: candidate.projectName,
+                    projectPriority: candidate.projectPriority,
                     remainingHours: candidate.remainingHours,
                     reason: "Capacidad semanal insuficiente en el horizonte de \(weeksToSchedule) semanas."
                 )

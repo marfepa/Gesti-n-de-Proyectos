@@ -6,6 +6,8 @@ public struct GanttChartView: View {
     @Binding public var selectedTask: ProjectTask?
     public let onEditTask: (ProjectTask) -> Void
 
+    @State private var showSubtasksInGantt: Bool = true
+
     public init(
         tasks: [ProjectTask],
         selectedTask: Binding<ProjectTask?>,
@@ -14,6 +16,65 @@ public struct GanttChartView: View {
         self.tasks = tasks
         self._selectedTask = selectedTask
         self.onEditTask = onEditTask
+    }
+
+    /// Estructura aplanada para graficar tanto tareas principales como sus subtareas asociadas en el eje Y.
+    private struct GanttChartItem: Identifiable {
+        let id: String
+        let title: String
+        let parentTitle: String?
+        let startDate: Date
+        let endDate: Date
+        let isCompleted: Bool
+        let isSubtask: Bool
+        let taskRef: ProjectTask
+    }
+
+    private var chartItems: [GanttChartItem] {
+        var items: [GanttChartItem] = []
+
+        for task in tasks {
+            // Tarea principal
+            items.append(
+                GanttChartItem(
+                    id: task.id.uuidString,
+                    title: task.title,
+                    parentTitle: nil,
+                    startDate: task.startDate,
+                    endDate: task.endDate,
+                    isCompleted: task.isCompleted,
+                    isSubtask: false,
+                    taskRef: task
+                )
+            )
+
+            // Subtareas si está activado
+            if showSubtasksInGantt && !task.subtasks.isEmpty {
+                let subtasks = task.sortedSubtasks
+                let totalSubtasks = max(1, subtasks.count)
+                let taskSpan = max(1.0, task.endDate.timeIntervalSince(task.startDate))
+                let slice = taskSpan / Double(totalSubtasks)
+
+                for (idx, subtask) in subtasks.enumerated() {
+                    let subStart = task.startDate.addingTimeInterval(Double(idx) * slice)
+                    let subEnd = task.startDate.addingTimeInterval(Double(idx + 1) * slice)
+
+                    items.append(
+                        GanttChartItem(
+                            id: subtask.id.uuidString,
+                            title: "  ↳ \(subtask.title)",
+                            parentTitle: task.title,
+                            startDate: subStart,
+                            endDate: subEnd,
+                            isCompleted: subtask.isCompleted,
+                            isSubtask: true,
+                            taskRef: task
+                        )
+                    )
+                }
+            }
+        }
+        return items
     }
 
     public var body: some View {
@@ -26,11 +87,14 @@ public struct GanttChartView: View {
                 Spacer()
 
                 HStack(spacing: 16) {
+                    Toggle(String(localized: "Ver subtareas"), isOn: $showSubtasksInGantt)
+                        .font(.caption)
+
                     HStack(spacing: 6) {
                         Circle()
                             .fill(Color.blue)
                             .frame(width: 8, height: 8)
-                        Text(String(localized: "En progreso / Pendiente"))
+                        Text(String(localized: "En progreso"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -40,6 +104,15 @@ public struct GanttChartView: View {
                             .fill(Color.green)
                             .frame(width: 8, height: 8)
                         Text(String(localized: "Completada"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.purple)
+                            .frame(width: 8, height: 8)
+                        Text(String(localized: "Subtarea"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -56,6 +129,7 @@ public struct GanttChartView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 let scale = timeScale
+                let items = chartItems
                 ScrollView([.horizontal, .vertical]) {
                     Chart {
                         // Línea indicadora del día de hoy solo si cae dentro del cronograma
@@ -77,20 +151,22 @@ public struct GanttChartView: View {
                             }
                         }
 
-                        // Barras horizontales por tarea
-                        ForEach(tasks) { task in
+                        // Barras horizontales por tarea y subtarea
+                        ForEach(items) { item in
                             BarMark(
-                                xStart: .value(String(localized: "Inicio"), task.startDate),
-                                xEnd: .value(String(localized: "Fin"), task.endDate),
-                                y: .value(String(localized: "Tarea"), task.title)
+                                xStart: .value(String(localized: "Inicio"), item.startDate),
+                                xEnd: .value(String(localized: "Fin"), item.endDate),
+                                y: .value(String(localized: "Tarea"), item.title)
                             )
-                            .foregroundStyle(task.isCompleted ? Color.green.gradient : Color.blue.gradient)
-                            .cornerRadius(6)
+                            .foregroundStyle(barColor(for: item))
+                            .cornerRadius(item.isSubtask ? 3 : 6)
                             .annotation(position: .trailing, alignment: .center) {
-                                Text("\(task.durationInDays)d")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.leading, 4)
+                                if !item.isSubtask {
+                                    Text("\(item.taskRef.durationInDays)d")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.leading, 4)
+                                }
                             }
                         }
                     }
@@ -110,7 +186,7 @@ public struct GanttChartView: View {
                     }
                     .frame(
                         minWidth: max(600, CGFloat(scale.totalDays * 25)),
-                        minHeight: max(300, CGFloat(tasks.count * 45 + 80))
+                        minHeight: max(300, CGFloat(items.count * 38 + 80))
                     )
                     .padding()
                 }
@@ -122,6 +198,16 @@ public struct GanttChartView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.gray.opacity(0.15), lineWidth: 1)
         )
+    }
+
+    private func barColor(for item: GanttChartItem) -> AnyShapeStyle {
+        if item.isCompleted {
+            return AnyShapeStyle(Color.green.gradient)
+        } else if item.isSubtask {
+            return AnyShapeStyle(Color.purple.opacity(0.85).gradient)
+        } else {
+            return AnyShapeStyle(Color.blue.gradient)
+        }
     }
 
     private var timeScale: GanttTimeScale {

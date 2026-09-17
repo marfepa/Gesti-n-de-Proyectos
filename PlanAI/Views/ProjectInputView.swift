@@ -10,6 +10,9 @@ public struct ProjectInputView: View {
     @State private var projectName: String = ""
     @State private var projectDescription: String = ""
     @State private var startDate: Date = Date()
+    @State private var hasTargetEndDate: Bool = false
+    @State private var targetEndDate: Date = Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
+    @State private var priority: ProjectPriority = .media
 
     // Servicio nativo de audio y transcripción
     @State private var transcriptionService = AudioTranscriptionService()
@@ -39,14 +42,51 @@ public struct ProjectInputView: View {
                         .textFieldStyle(.roundedBorder)
                     }
 
-                    // Fecha de Inicio
-                    VStack(alignment: .leading, spacing: 6) {
-                        DatePicker(
-                            String(localized: "Fecha de Inicio del Proyecto"),
-                            selection: $startDate,
-                            displayedComponents: [.date]
-                        )
-                        .datePickerStyle(.compact)
+                    // Fechas y Prioridad
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                DatePicker(
+                                    String(localized: "Fecha de Inicio"),
+                                    selection: $startDate,
+                                    displayedComponents: [.date]
+                                )
+                                .datePickerStyle(.compact)
+                            }
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(String(localized: "Prioridad:"))
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+
+                                    Picker("", selection: $priority) {
+                                        ForEach(ProjectPriority.allCases) { p in
+                                            Label(p.title, systemImage: p.iconName).tag(p)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .frame(width: 130)
+                                }
+                            }
+                        }
+
+                        // Fecha Límite / Fin Objetivo opcional
+                        HStack(spacing: 12) {
+                            Toggle(String(localized: "Fijar fecha fin objetivo"), isOn: $hasTargetEndDate)
+                                .font(.subheadline)
+
+                            if hasTargetEndDate {
+                                DatePicker(
+                                    "",
+                                    selection: $targetEndDate,
+                                    in: startDate...,
+                                    displayedComponents: [.date]
+                                )
+                                .datePickerStyle(.compact)
+                                .labelsHidden()
+                            }
+                        }
                     }
 
                     // Cabecera de Descripción con Controles de Dictado
@@ -167,11 +207,14 @@ public struct ProjectInputView: View {
                                 transcriptionService.stopRecording()
                             }
 
+                            let effectiveTarget = hasTargetEndDate ? targetEndDate : nil
                             Task {
                                 await viewModel.createProjectWithAI(
                                     name: projectName,
                                     description: projectDescription,
                                     startDate: startDate,
+                                    targetEndDate: effectiveTarget,
+                                    priority: priority,
                                     context: modelContext
                                 )
                             }
@@ -199,10 +242,13 @@ public struct ProjectInputView: View {
                                 transcriptionService.stopRecording()
                             }
 
+                            let effectiveTarget = hasTargetEndDate ? targetEndDate : nil
                             viewModel.createManualProject(
                                 name: projectName,
                                 description: projectDescription,
                                 startDate: startDate,
+                                targetEndDate: effectiveTarget,
+                                priority: priority,
                                 context: modelContext
                             )
                         }) {
