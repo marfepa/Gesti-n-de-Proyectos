@@ -169,12 +169,13 @@ public final class AudioTranscriptionService {
 
     /// Comienza la grabación de audio del micrófono y escribe los buffers a un archivo temporal .caf en disco.
     public func startRecording() async {
-        guard !isRecording else { return }
+        guard !isRecording && !isTranscribing else { return }
 
         let hasPermissions = await requestPermissions()
         guard hasPermissions else { return }
 
-        // Limpiar grabación previa si existiera
+        // Limpiar estado y grabación previa completamente
+        stopEngineIfRunning()
         cleanupTempFile()
         self.errorMessage = nil
         self.transcribedText = ""
@@ -185,6 +186,9 @@ public final class AudioTranscriptionService {
         self.recordedFileURL = fileURL
 
         do {
+            // Resetear el graph de audio para evitar kAudioUnitErr_Uninitialized (-10877)
+            audioEngine.reset()
+
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
 
@@ -207,6 +211,7 @@ public final class AudioTranscriptionService {
             self.recordingDuration = 0
             startDurationTimer()
         } catch {
+            stopEngineIfRunning()
             self.errorMessage = error.localizedDescription
             self.phase = .error(error.localizedDescription)
             cleanupTempFile()
@@ -218,11 +223,18 @@ public final class AudioTranscriptionService {
         guard isRecording else { return }
 
         stopDurationTimer()
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        stopEngineIfRunning()
         fileWriter.finish()
 
         self.phase = .idle
+    }
+
+    /// Detiene el motor de audio de forma segura si está corriendo.
+    private func stopEngineIfRunning() {
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        audioEngine.inputNode.removeTap(onBus: 0)
     }
 
     /// Transcribe el archivo previamente grabado utilizando transcripción offline on-device.
@@ -275,10 +287,9 @@ public final class AudioTranscriptionService {
     public func cancel() {
         if isRecording {
             stopDurationTimer()
-            audioEngine.stop()
-            audioEngine.inputNode.removeTap(onBus: 0)
-            fileWriter.finish()
         }
+        stopEngineIfRunning()
+        fileWriter.finish()
         activeTranscriptionTask?.cancel()
         activeTranscriptionTask = nil
         cleanupTempFile()
