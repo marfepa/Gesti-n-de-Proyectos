@@ -9,11 +9,14 @@
 /* Begin PBXBuildFile section */
 		0A0712FC7CAF2BF6CEB58D8C /* GanttChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F9F1DC545F2BE20240DC329 /* GanttChartView.swift */; };
 		10C530669D3B5FA63ED705C2 /* AIAvailabilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */; };
+		123806CBCC919547EB690362 /* WorkSlot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948F92843BD2C81AE242FE89 /* WorkSlot.swift */; };
 		166C1A4ADC40B18943DBD8E6 /* AIStatusBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7547B5CE61B5E89E7458DB8 /* AIStatusBanner.swift */; };
 		1E15D36797489A41A4FDD70A /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6519F9C103F89FC2055344A7 /* TaskListView.swift */; };
 		24742F34ED6B32E12CB4481D /* TaskDecompositionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C2E3C9D42B542CA513B7B9 /* TaskDecompositionService.swift */; };
 		25E050BB88C1628F428FA52E /* PlanAIApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B05E4582ED3F3A03DB8B1A /* PlanAIApp.swift */; };
 		312650D1DCD7ACB6AF5D95F5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D76D706E21F9E719783DC87 /* ContentView.swift */; };
+		352EF1C4BE62E5BB98962ADE /* WeeklySchedulerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C414308B6A033F8DE2D18545 /* WeeklySchedulerService.swift */; };
+		469BBCBCC433C985A3737B8E /* WeeklySchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF65DF172C933CE3C77184D5 /* WeeklySchedulerTests.swift */; };
 		709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */; };
 		813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5487C1BEB5E269B777A4877A /* ProjectInputView.swift */; };
 		8274EFE9C9AF24D3F6D0CC27 /* GenerablePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */; };
@@ -21,6 +24,7 @@
 		A2B566D492415914134B68FC /* GanttTimeScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDD18A4EB56CCA45DAFA092A /* GanttTimeScaleTests.swift */; };
 		AB8EA9FC2ED362CB959C7854 /* AudioTranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D95202D689690C6C712033E /* AudioTranscriptionService.swift */; };
 		B79EF63F8A19517E9ADD6BE2 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = C6151A7E6B60A91DC3BEFCF5 /* Localizable.strings */; };
+		DD60F735C903B4247748A97F /* WeeklyScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A55FDFD5E31730819A7A1D /* WeeklyScheduleView.swift */; };
 		E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */; };
 		EFC64112F1F8FB63D8177C7C /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5CDFD9DAE28D9627B7F0CE /* Project.swift */; };
 		F2BED910A196DBAF3808C164 /* ProjectTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769D313F968862C918E89E87 /* ProjectTask.swift */; };
@@ -54,13 +58,17 @@
 		7F9F1DC545F2BE20240DC329 /* GanttChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanttChartView.swift; sourceTree = "<group>"; };
 		8C5CDFD9DAE28D9627B7F0CE /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
 		93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAvailabilityService.swift; sourceTree = "<group>"; };
+		948F92843BD2C81AE242FE89 /* WorkSlot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkSlot.swift; sourceTree = "<group>"; };
 		A7547B5CE61B5E89E7458DB8 /* AIStatusBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIStatusBanner.swift; sourceTree = "<group>"; };
 		B3B05E4582ED3F3A03DB8B1A /* PlanAIApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanAIApp.swift; sourceTree = "<group>"; };
 		B6C7B227843D3CE074AF7003 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B8A55FDFD5E31730819A7A1D /* WeeklyScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyScheduleView.swift; sourceTree = "<group>"; };
 		BDD18A4EB56CCA45DAFA092A /* GanttTimeScaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanttTimeScaleTests.swift; sourceTree = "<group>"; };
 		C14D55974729525BBB372E79 /* GanttTimeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GanttTimeScale.swift; sourceTree = "<group>"; };
+		C414308B6A033F8DE2D18545 /* WeeklySchedulerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySchedulerService.swift; sourceTree = "<group>"; };
 		CD567D2AE71BA320EE8A46BE /* PlanAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlanAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED8F8393A159DC2EEC327116 /* PlanAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlanAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF65DF172C933CE3C77184D5 /* WeeklySchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySchedulerTests.swift; sourceTree = "<group>"; };
 		F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
 		FDE6984013676CCBDF00DCEC /* PlanAI.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PlanAI.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -81,6 +89,7 @@
 				54DE674E0D434AD1C33F87A7 /* GenerablePlan.swift */,
 				8C5CDFD9DAE28D9627B7F0CE /* Project.swift */,
 				769D313F968862C918E89E87 /* ProjectTask.swift */,
+				948F92843BD2C81AE242FE89 /* WorkSlot.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -120,6 +129,7 @@
 				5487C1BEB5E269B777A4877A /* ProjectInputView.swift */,
 				4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */,
 				6519F9C103F89FC2055344A7 /* TaskListView.swift */,
+				B8A55FDFD5E31730819A7A1D /* WeeklyScheduleView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -146,6 +156,7 @@
 				93BBDB5B433D9718FD8A52F8 /* AIAvailabilityService.swift */,
 				0D95202D689690C6C712033E /* AudioTranscriptionService.swift */,
 				70C2E3C9D42B542CA513B7B9 /* TaskDecompositionService.swift */,
+				C414308B6A033F8DE2D18545 /* WeeklySchedulerService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -187,6 +198,7 @@
 			children = (
 				BDD18A4EB56CCA45DAFA092A /* GanttTimeScaleTests.swift */,
 				7D88DFF0EAC490B0BC2506A7 /* TaskDecompositionTests.swift */,
+				EF65DF172C933CE3C77184D5 /* WeeklySchedulerTests.swift */,
 			);
 			path = PlanAITests;
 			sourceTree = "<group>";
@@ -280,6 +292,7 @@
 			files = (
 				A2B566D492415914134B68FC /* GanttTimeScaleTests.swift in Sources */,
 				F5484B32124272E1CCA31B3F /* TaskDecompositionTests.swift in Sources */,
+				469BBCBCC433C985A3737B8E /* WeeklySchedulerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +316,9 @@
 				24742F34ED6B32E12CB4481D /* TaskDecompositionService.swift in Sources */,
 				E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */,
 				1E15D36797489A41A4FDD70A /* TaskListView.swift in Sources */,
+				DD60F735C903B4247748A97F /* WeeklyScheduleView.swift in Sources */,
+				352EF1C4BE62E5BB98962ADE /* WeeklySchedulerService.swift in Sources */,
+				123806CBCC919547EB690362 /* WorkSlot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

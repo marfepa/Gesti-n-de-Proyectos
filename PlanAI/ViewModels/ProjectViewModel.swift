@@ -9,6 +9,12 @@ public final class ProjectViewModel {
     public var errorMessage: String?
     public var showErrorAlert: Bool = false
     
+    public enum SidebarTab: Hashable {
+        case projects
+        case weeklySchedule
+    }
+
+    public var activeTab: SidebarTab = .projects
     public var selectedProject: Project?
     public var showingNewProjectSheet: Bool = false
     public var showingTaskSheet: Bool = false
@@ -103,6 +109,7 @@ public final class ProjectViewModel {
         notes: String,
         startDate: Date,
         endDate: Date,
+        estimatedHours: Double = 4.0,
         in project: Project,
         context: ModelContext
     ) {
@@ -121,6 +128,7 @@ public final class ProjectViewModel {
             existing.startDate = normalizedStart
             existing.endDate = max(normalizedStart, normalizedEnd)
             existing.estimatedDays = days
+            existing.estimatedHours = estimatedHours
         } else {
             let nextOrder = (project.tasks.map(\.sortOrder).max() ?? -1) + 1
             let newTask = ProjectTask(
@@ -129,6 +137,7 @@ public final class ProjectViewModel {
                 startDate: normalizedStart,
                 endDate: max(normalizedStart, normalizedEnd),
                 estimatedDays: days,
+                estimatedHours: estimatedHours,
                 isCompleted: false,
                 sortOrder: nextOrder,
                 project: project

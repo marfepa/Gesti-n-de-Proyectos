@@ -9,8 +9,10 @@ public final class ProjectTask: Identifiable {
     public var startDate: Date = Date()
     public var endDate: Date = Date()
     public var estimatedDays: Int = 1
+    public var estimatedHours: Double = 4.0
     public var isCompleted: Bool = false
     public var sortOrder: Int = 0
+    public var scheduledDate: Date?
     
     public var project: Project?
 
@@ -21,8 +23,10 @@ public final class ProjectTask: Identifiable {
         startDate: Date,
         endDate: Date,
         estimatedDays: Int = 1,
+        estimatedHours: Double? = nil,
         isCompleted: Bool = false,
         sortOrder: Int = 0,
+        scheduledDate: Date? = nil,
         project: Project? = nil
     ) {
         self.id = id
@@ -31,8 +35,10 @@ public final class ProjectTask: Identifiable {
         self.startDate = startDate
         self.endDate = endDate
         self.estimatedDays = max(1, estimatedDays)
+        self.estimatedHours = estimatedHours ?? Double(max(1, estimatedDays) * 4)
         self.isCompleted = isCompleted
         self.sortOrder = sortOrder
+        self.scheduledDate = scheduledDate
         self.project = project
     }
 

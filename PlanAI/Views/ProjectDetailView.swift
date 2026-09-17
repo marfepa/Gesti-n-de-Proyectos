@@ -136,12 +136,13 @@ public struct ProjectDetailView: View {
         )) {
             TaskEditSheet(
                 task: viewModel.editingTask,
-                onSave: { title, notes, start, end in
+                onSave: { title, notes, start, end, hours in
                     viewModel.saveTask(
                         title: title,
                         notes: notes,
                         startDate: start,
                         endDate: end,
+                        estimatedHours: hours,
                         in: project,
                         context: modelContext
                     )
