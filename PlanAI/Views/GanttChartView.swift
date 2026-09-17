@@ -55,23 +55,26 @@ public struct GanttChartView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                let scale = timeScale
                 ScrollView([.horizontal, .vertical]) {
                     Chart {
-                        // Línea indicadora del día de hoy
-                        RuleMark(
-                            x: .value(String(localized: "Hoy"), Date())
-                        )
-                        .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
-                        .foregroundStyle(Color.red.opacity(0.7))
-                        .annotation(position: .top, alignment: .leading) {
-                            Text(String(localized: "Hoy"))
-                                .font(.caption2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.red)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(Color.red.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        // Línea indicadora del día de hoy solo si cae dentro del cronograma
+                        if scale.isTodayVisible {
+                            RuleMark(
+                                x: .value(String(localized: "Hoy"), scale.today)
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                            .foregroundStyle(Color.red.opacity(0.7))
+                            .annotation(position: .top, alignment: .leading) {
+                                Text(String(localized: "Hoy"))
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(Color.red.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
                         }
 
                         // Barras horizontales por tarea
@@ -91,8 +94,9 @@ public struct GanttChartView: View {
                             }
                         }
                     }
+                    .chartXScale(domain: scale.domain)
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .day, count: 7)) { value in
+                        AxisMarks(values: scale.ticks) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                             AxisTick()
                             AxisValueLabel(format: .dateTime.day().month(.abbreviated))
@@ -105,7 +109,7 @@ public struct GanttChartView: View {
                         }
                     }
                     .frame(
-                        minWidth: max(600, CGFloat(chartWidthCalculated)),
+                        minWidth: max(600, CGFloat(scale.totalDays * 25)),
                         minHeight: max(300, CGFloat(tasks.count * 45 + 80))
                     )
                     .padding()
@@ -120,12 +124,7 @@ public struct GanttChartView: View {
         )
     }
 
-    private var chartWidthCalculated: Int {
-        guard let minDate = tasks.map(\.startDate).min(),
-              let maxDate = tasks.map(\.endDate).max() else {
-            return 600
-        }
-        let days = Calendar.current.dateComponents([.day], from: minDate, to: maxDate).day ?? 14
-        return max(600, days * 25)
+    private var timeScale: GanttTimeScale {
+        GanttTimeScale(tasks: tasks)
     }
 }

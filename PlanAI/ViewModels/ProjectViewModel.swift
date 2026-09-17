@@ -31,17 +31,20 @@ public final class ProjectViewModel {
         
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let projectName = trimmedName.isEmpty ? String(localized: "Proyecto sin título") : trimmedName
+        let calendar = Calendar.current
+        let normalizedStart = calendar.startOfDay(for: startDate)
         
         do {
             let payloads = try await decompositionService.decompose(
                 projectDescription: description,
-                startDate: startDate
+                startDate: normalizedStart,
+                calendar: calendar
             )
 
             let project = Project(
                 name: projectName,
                 projectDescription: description,
-                startDate: startDate
+                startDate: normalizedStart
             )
             context.insert(project)
 
@@ -80,11 +83,13 @@ public final class ProjectViewModel {
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let projectName = trimmedName.isEmpty ? String(localized: "Proyecto Manual") : trimmedName
+        let calendar = Calendar.current
+        let normalizedStart = calendar.startOfDay(for: startDate)
 
         let project = Project(
             name: projectName,
             projectDescription: description,
-            startDate: startDate
+            startDate: normalizedStart
         )
         context.insert(project)
         try? context.save()
@@ -102,22 +107,27 @@ public final class ProjectViewModel {
         context: ModelContext
     ) {
         let calendar = Calendar.current
-        let comps = calendar.dateComponents([.day], from: startDate, to: endDate)
+        let normalizedStart = calendar.startOfDay(for: startDate)
+        var normalizedEnd = calendar.startOfDay(for: endDate)
+        if normalizedEnd < normalizedStart {
+            normalizedEnd = normalizedStart
+        }
+        let comps = calendar.dateComponents([.day], from: normalizedStart, to: normalizedEnd)
         let days = max(1, comps.day ?? 1)
 
         if let existing = editingTask {
             existing.title = title
             existing.notes = notes
-            existing.startDate = startDate
-            existing.endDate = max(startDate, endDate)
+            existing.startDate = normalizedStart
+            existing.endDate = max(normalizedStart, normalizedEnd)
             existing.estimatedDays = days
         } else {
             let nextOrder = (project.tasks.map(\.sortOrder).max() ?? -1) + 1
             let newTask = ProjectTask(
                 title: title,
                 notes: notes,
-                startDate: startDate,
-                endDate: max(startDate, endDate),
+                startDate: normalizedStart,
+                endDate: max(normalizedStart, normalizedEnd),
                 estimatedDays: days,
                 isCompleted: false,
                 sortOrder: nextOrder,
