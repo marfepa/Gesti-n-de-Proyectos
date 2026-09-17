@@ -172,6 +172,22 @@ public struct ProjectDetailView: View {
                 // Indicadores de resumen
                 HStack(spacing: 20) {
                     VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(localized: "Prioridad"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: $project.priority) {
+                            ForEach(ProjectPriority.allCases) { p in
+                                Label(p.title, systemImage: p.iconName).tag(p)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 110)
+                        .onChange(of: project.priority) { _, _ in
+                            try? modelContext.save()
+                        }
+                    }
+
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text(String(localized: "Duración"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)

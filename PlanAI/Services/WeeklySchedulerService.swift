@@ -6,6 +6,7 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public var taskId: UUID
     public var taskTitle: String
     public var projectName: String
+    public var projectPriority: ProjectPriority
     public var date: Date
     public var startMinute: Int
     public var endMinute: Int
@@ -17,6 +18,7 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         taskId: UUID,
         taskTitle: String,
         projectName: String,
+        projectPriority: ProjectPriority = .media,
         date: Date,
         startMinute: Int,
         endMinute: Int,
@@ -27,6 +29,7 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         self.taskId = taskId
         self.taskTitle = taskTitle
         self.projectName = projectName
+        self.projectPriority = projectPriority
         self.date = date
         self.startMinute = startMinute
         self.endMinute = endMinute
@@ -46,13 +49,22 @@ public struct UnscheduledTaskInfo: Identifiable, Sendable, Equatable {
     public var id: UUID
     public var taskTitle: String
     public var projectName: String
+    public var projectPriority: ProjectPriority
     public var remainingHours: Double
     public var reason: String
 
-    public init(id: UUID, taskTitle: String, projectName: String, remainingHours: Double, reason: String) {
+    public init(
+        id: UUID,
+        taskTitle: String,
+        projectName: String,
+        projectPriority: ProjectPriority = .media,
+        remainingHours: Double,
+        reason: String
+    ) {
         self.id = id
         self.taskTitle = taskTitle
         self.projectName = projectName
+        self.projectPriority = projectPriority
         self.remainingHours = remainingHours
         self.reason = reason
     }
@@ -98,10 +110,11 @@ public final class WeeklySchedulerService: Sendable {
     ) -> ScheduleResult {
         let enabledSlots = slots.filter { $0.isEnabled && $0.durationMinutes > 0 }
         
-        // 1. Recopilar tareas pendientes de proyectos activos ordenadas según criterio seguro (EDF + Fase)
+        // 1. Recopilar tareas pendientes de proyectos activos ordenadas según criterio seguro (Prioridad + EDF + Fase)
         struct TaskCandidate {
             let task: ProjectTask
             let projectName: String
+            let projectPriority: ProjectPriority
             let projectDeadline: Date
             let sortOrder: Int
             var remainingHours: Double
@@ -113,6 +126,7 @@ public final class WeeklySchedulerService: Sendable {
         for project in projects {
             let pendingTasks = project.sortedTasks.filter { !$0.isCompleted }
             let deadline = project.estimatedEndDate
+            let priority = project.priority
             for task in pendingTasks {
                 let hours = max(0.5, task.estimatedHours)
                 totalDemand += hours
@@ -120,6 +134,7 @@ public final class WeeklySchedulerService: Sendable {
                     TaskCandidate(
                         task: task,
                         projectName: project.name,
+                        projectPriority: priority,
                         projectDeadline: deadline,
                         sortOrder: task.sortOrder,
                         remainingHours: hours
@@ -128,8 +143,15 @@ public final class WeeklySchedulerService: Sendable {
             }
         }
 
-        // Orden de prioridad: Earliest Deadline First (EDF) del proyecto, y dentro de cada proyecto el orden secuencial de la tarea
+        // Orden de prioridad:
+        // 1. Prioridad del proyecto (urgente > alta > media > baja)
+        // 2. Earliest Deadline First (EDF) del proyecto
+        // 3. Nombre del proyecto (determinismo)
+        // 4. Orden secuencial de la tarea dentro del proyecto
         candidates.sort { a, b in
+            if a.projectPriority != b.projectPriority {
+                return a.projectPriority.rawValue > b.projectPriority.rawValue
+            }
             if a.projectDeadline != b.projectDeadline {
                 return a.projectDeadline < b.projectDeadline
             }
@@ -147,6 +169,7 @@ public final class WeeklySchedulerService: Sendable {
                         id: $0.task.id,
                         taskTitle: $0.task.title,
                         projectName: $0.projectName,
+                        projectPriority: $0.projectPriority,
                         remainingHours: $0.remainingHours,
                         reason: "No hay momentos disponibles configurados o habilitados."
                     )
@@ -227,6 +250,7 @@ public final class WeeklySchedulerService: Sendable {
                         taskId: candidates[candidateIndex].task.id,
                         taskTitle: candidates[candidateIndex].task.title,
                         projectName: candidates[candidateIndex].projectName,
+                        projectPriority: candidates[candidateIndex].projectPriority,
                         date: currentSlot.date,
                         startMinute: startMin,
                         endMinute: endMin,
@@ -255,6 +279,7 @@ public final class WeeklySchedulerService: Sendable {
                     id: candidate.task.id,
                     taskTitle: candidate.task.title,
                     projectName: candidate.projectName,
+                    projectPriority: candidate.projectPriority,
                     remainingHours: candidate.remainingHours,
                     reason: "Capacidad semanal insuficiente en el horizonte de \(weeksToSchedule) semanas."
                 )

@@ -30,6 +30,7 @@ public final class ProjectViewModel {
         name: String,
         description: String,
         startDate: Date,
+        priority: ProjectPriority = .media,
         context: ModelContext
     ) async {
         isDecomposing = true
@@ -50,7 +51,8 @@ public final class ProjectViewModel {
             let project = Project(
                 name: projectName,
                 projectDescription: description,
-                startDate: normalizedStart
+                startDate: normalizedStart,
+                priority: priority
             )
             context.insert(project)
 
@@ -85,6 +87,7 @@ public final class ProjectViewModel {
         name: String,
         description: String,
         startDate: Date,
+        priority: ProjectPriority = .media,
         context: ModelContext
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,7 +98,8 @@ public final class ProjectViewModel {
         let project = Project(
             name: projectName,
             projectDescription: description,
-            startDate: normalizedStart
+            startDate: normalizedStart,
+            priority: priority
         )
         context.insert(project)
         try? context.save()

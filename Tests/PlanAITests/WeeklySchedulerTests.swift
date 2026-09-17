@@ -148,4 +148,49 @@ final class WeeklySchedulerTests: XCTestCase {
         XCTAssertEqual(result.unscheduledTasks.first?.taskTitle, "Desarrollo Completo")
         XCTAssertGreaterThan(result.deficitHours, 8.0)
     }
+
+    func testProjectPriorityTakesPrecedenceOverDeadline() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
+
+        // Proyecto A: Deadline más cercano (3 días), pero prioridad Baja
+        let lowPriorityProj = Project(name: "Low Priority Near Deadline", startDate: refDate, priority: .baja)
+        let lowTask = ProjectTask(
+            title: "Low Priority Task",
+            startDate: refDate,
+            endDate: calendar.date(byAdding: .day, value: 3, to: refDate)!,
+            estimatedHours: 2.0,
+            project: lowPriorityProj
+        )
+        lowPriorityProj.tasks = [lowTask]
+
+        // Proyecto B: Deadline más lejano (10 días), pero prioridad Urgente
+        let urgentProj = Project(name: "Urgent Priority Later Deadline", startDate: refDate, priority: .urgente)
+        let urgentTask = ProjectTask(
+            title: "Urgent Priority Task",
+            startDate: refDate,
+            endDate: calendar.date(byAdding: .day, value: 10, to: refDate)!,
+            estimatedHours: 2.0,
+            project: urgentProj
+        )
+        urgentProj.tasks = [urgentTask]
+
+        // Solo 2 horas disponibles en total
+        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 11 * 60)
+
+        let result = service.schedule(
+            projects: [lowPriorityProj, urgentProj],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        // El proyecto Urgente debe ser asignado primero a pesar de que su deadline sea posterior
+        XCTAssertEqual(result.scheduledItems.count, 1)
+        XCTAssertEqual(result.scheduledItems.first?.taskTitle, "Urgent Priority Task")
+        XCTAssertEqual(result.scheduledItems.first?.projectPriority, .urgente)
+        XCTAssertEqual(result.unscheduledTasks.first?.taskTitle, "Low Priority Task")
+    }
 }
