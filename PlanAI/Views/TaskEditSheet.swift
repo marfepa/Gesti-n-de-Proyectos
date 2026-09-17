@@ -4,14 +4,15 @@ public struct TaskEditSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     public let task: ProjectTask?
-    public let onSave: (String, String, Date, Date) -> Void
+    public let onSave: (String, String, Date, Date, Double) -> Void
 
     @State private var title: String = ""
     @State private var notes: String = ""
     @State private var startDate: Date = Date()
     @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date()
+    @State private var estimatedHours: Double = 4.0
 
-    public init(task: ProjectTask?, onSave: @escaping (String, String, Date, Date) -> Void) {
+    public init(task: ProjectTask?, onSave: @escaping (String, String, Date, Date, Double) -> Void) {
         self.task = task
         self.onSave = onSave
     }
@@ -49,13 +50,23 @@ public struct TaskEditSheet: View {
                     )
 
                     HStack {
-                        Text(String(localized: "Duración estimada:"))
+                        Text(String(localized: "Duración en días:"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
                         Text("\(calculatedDays) " + String(localized: "días laborables"))
                             .font(.caption)
                             .fontWeight(.semibold)
+                    }
+
+                    Stepper(value: $estimatedHours, in: 0.5...40.0, step: 0.5) {
+                        HStack {
+                            Text(String(localized: "Horas de trabajo estimadas:"))
+                            Spacer()
+                            Text(String(format: "%.1f h", estimatedHours))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.blue)
+                        }
                     }
                 }
             }
@@ -69,7 +80,7 @@ public struct TaskEditSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "Guardar")) {
-                        onSave(title, notes, startDate, endDate)
+                        onSave(title, notes, startDate, endDate, estimatedHours)
                         dismiss()
                     }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -81,6 +92,7 @@ public struct TaskEditSheet: View {
                     self.notes = task.notes
                     self.startDate = task.startDate
                     self.endDate = task.endDate
+                    self.estimatedHours = task.estimatedHours
                 }
             }
             .frame(minWidth: 420, minHeight: 340)

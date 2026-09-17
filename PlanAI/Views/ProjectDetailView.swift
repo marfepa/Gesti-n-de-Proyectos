@@ -73,6 +73,18 @@ public struct ProjectDetailView: View {
                         },
                         onDelete: { task in
                             viewModel.deleteTask(task, context: modelContext)
+                        },
+                        onToggleSubtask: { subtask in
+                            viewModel.toggleSubtaskCompletion(subtask, context: modelContext)
+                        },
+                        onDecomposeTask: { task in
+                            viewModel.decomposeTask(task, context: modelContext)
+                        },
+                        onAddSubtask: { task, title, hours in
+                            viewModel.addSubtask(title: title, hours: hours, to: task, context: modelContext)
+                        },
+                        onDeleteSubtask: { subtask in
+                            viewModel.deleteSubtask(subtask, context: modelContext)
                         }
                     )
 
@@ -101,6 +113,18 @@ public struct ProjectDetailView: View {
                             },
                             onDelete: { task in
                                 viewModel.deleteTask(task, context: modelContext)
+                            },
+                            onToggleSubtask: { subtask in
+                                viewModel.toggleSubtaskCompletion(subtask, context: modelContext)
+                            },
+                            onDecomposeTask: { task in
+                                viewModel.decomposeTask(task, context: modelContext)
+                            },
+                            onAddSubtask: { task, title, hours in
+                                viewModel.addSubtask(title: title, hours: hours, to: task, context: modelContext)
+                            },
+                            onDeleteSubtask: { subtask in
+                                viewModel.deleteSubtask(subtask, context: modelContext)
                             }
                         )
                         .frame(minHeight: 180)
@@ -121,14 +145,30 @@ public struct ProjectDetailView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
-                Button(action: {
-                    viewModel.editingTask = nil
-                    viewModel.showingTaskSheet = true
-                }) {
-                    Label(String(localized: "Añadir Tarea"), systemImage: "plus")
+                HStack(spacing: 8) {
+                    Button(action: {
+                        viewModel.projectToEdit = project
+                        viewModel.showingEditProjectSheet = true
+                    }) {
+                        Label(String(localized: "Editar Proyecto"), systemImage: "pencil")
+                    }
+                    .help(String(localized: "Editar nombre, fechas, prioridad y descripción"))
+
+                    Button(action: {
+                        viewModel.editingTask = nil
+                        viewModel.showingTaskSheet = true
+                    }) {
+                        Label(String(localized: "Añadir Tarea"), systemImage: "plus")
+                    }
+                    .help(String(localized: "Añadir una tarea manual a este proyecto"))
                 }
-                .help(String(localized: "Añadir una tarea manual a este proyecto"))
             }
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel.showingEditProjectSheet },
+            set: { viewModel.showingEditProjectSheet = $0 }
+        )) {
+            ProjectEditSheet(project: project, viewModel: viewModel)
         }
         .sheet(isPresented: Binding(
             get: { viewModel.showingTaskSheet },
@@ -136,12 +176,13 @@ public struct ProjectDetailView: View {
         )) {
             TaskEditSheet(
                 task: viewModel.editingTask,
-                onSave: { title, notes, start, end in
+                onSave: { title, notes, start, end, hours in
                     viewModel.saveTask(
                         title: title,
                         notes: notes,
                         startDate: start,
                         endDate: end,
+                        estimatedHours: hours,
                         in: project,
                         context: modelContext
                     )
@@ -171,6 +212,22 @@ public struct ProjectDetailView: View {
                 // Indicadores de resumen
                 HStack(spacing: 20) {
                     VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(localized: "Prioridad"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Picker("", selection: $project.priority) {
+                            ForEach(ProjectPriority.allCases) { p in
+                                Label(p.title, systemImage: p.iconName).tag(p)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 110)
+                        .onChange(of: project.priority) { _, _ in
+                            try? modelContext.save()
+                        }
+                    }
+
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text(String(localized: "Duración"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -189,6 +246,56 @@ public struct ProjectDetailView: View {
                             .foregroundStyle(project.progress == 1.0 ? .green : .blue)
                     }
                 }
+            }
+
+            // Información de fechas y ajuste de ventana
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Text(String(localized: "Inicio:"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(project.startDate.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+
+                HStack(spacing: 4) {
+                    Text(String(localized: "Fin estimado:"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(project.estimatedEndDate.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+
+                if let target = project.targetEndDate {
+                    HStack(spacing: 4) {
+                        Text(String(localized: "Objetivo:"))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(target.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(project.isOverdueOrExceedsTarget ? .orange : .green)
+                    }
+
+                    if project.isOverdueOrExceedsTarget {
+                        Label {
+                            Text("Excede \(project.targetVarianceInDays)d")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                        }
+                        .foregroundStyle(.orange)
+                    } else {
+                        Label(String(localized: "En plazo"), systemImage: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                Spacer()
             }
 
             // Barra de progreso visual

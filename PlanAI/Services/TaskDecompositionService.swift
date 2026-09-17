@@ -37,6 +37,7 @@ public final class TaskDecompositionService: Sendable {
     public func decompose(
         projectDescription: String,
         startDate: Date,
+        targetEndDate: Date? = nil,
         calendar: Calendar = .current
     ) async throws -> [GeneratedTaskPayload] {
         let trimmed = projectDescription.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,7 +70,7 @@ public final class TaskDecompositionService: Sendable {
                 let subtasks = response.content.subtasks.map {
                     SubtaskPlan(title: $0.title, estimatedDays: $0.estimatedDays, notes: $0.notes)
                 }
-                return buildTaskPayloads(from: subtasks, startingAt: startDate, calendar: calendar)
+                return buildTaskPayloads(from: subtasks, startingAt: startDate, targetEndDate: targetEndDate, calendar: calendar)
             } catch {
                 let errorString = String(describing: error)
                 if errorString.contains("context") || errorString.contains("exceeded") {
@@ -81,11 +82,11 @@ public final class TaskDecompositionService: Sendable {
                 }
             }
         } else {
-            return generateHeuristicPlan(from: trimmed, startDate: startDate, calendar: calendar)
+            return generateHeuristicPlan(from: trimmed, startDate: startDate, targetEndDate: targetEndDate, calendar: calendar)
         }
         #else
         // Fallback heurístico para entornos sin FoundationModels
-        return generateHeuristicPlan(from: trimmed, startDate: startDate, calendar: calendar)
+        return generateHeuristicPlan(from: trimmed, startDate: startDate, targetEndDate: targetEndDate, calendar: calendar)
         #endif
     }
 
@@ -93,22 +94,46 @@ public final class TaskDecompositionService: Sendable {
     public func buildTaskPayloads(
         from subtasks: [SubtaskPlan],
         startingAt startDate: Date,
+        targetEndDate: Date? = nil,
         calendar: Calendar = .current
     ) -> [GeneratedTaskPayload] {
         var currentStart = calendar.startOfDay(for: startDate)
         var results: [GeneratedTaskPayload] = []
 
+        // Si se especificó una fecha objetivo de fin y las duraciones la excederían,
+        // calcular factor de compresión para encajar en la ventana
+        var compressionRatio: Double = 1.0
+        let rawTotalDays = subtasks.reduce(0) { $0 + max(1, $1.estimatedDays) }
+
+        if let target = targetEndDate {
+            let normalizedTarget = calendar.startOfDay(for: target)
+            let comps = calendar.dateComponents([.day], from: currentStart, to: normalizedTarget)
+            let availableDays = max(1, comps.day ?? rawTotalDays)
+            if rawTotalDays > availableDays {
+                compressionRatio = Double(availableDays) / Double(rawTotalDays)
+            }
+        }
+
         for (index, item) in subtasks.enumerated() {
-            let days = max(1, item.estimatedDays)
-            let taskEnd = calendar.date(byAdding: .day, value: days, to: currentStart) ?? currentStart
+            let rawDays = Double(max(1, item.estimatedDays))
+            let compressedDays = max(1, Int(round(rawDays * compressionRatio)))
+            let taskEnd = calendar.date(byAdding: .day, value: compressedDays, to: currentStart) ?? currentStart
+
+            // Si la tarea es grande (>= 2 días o >= 6 horas), generar subtareas atómicas
+            let hours = Double(compressedDays * 4)
+            var generatedSubtasks: [(title: String, hours: Double)] = []
+            if compressedDays >= 2 || hours >= 6.0 {
+                generatedSubtasks = decomposeTaskIntoSubtasks(taskTitle: item.title, taskNotes: item.notes, estimatedHours: hours)
+            }
 
             let payload = GeneratedTaskPayload(
                 title: item.title.trimmingCharacters(in: .whitespacesAndNewlines),
                 notes: item.notes.trimmingCharacters(in: .whitespacesAndNewlines),
                 startDate: currentStart,
                 endDate: taskEnd,
-                estimatedDays: days,
-                sortOrder: index
+                estimatedDays: compressedDays,
+                sortOrder: index,
+                subtasks: generatedSubtasks
             )
             results.append(payload)
 
@@ -123,6 +148,7 @@ public final class TaskDecompositionService: Sendable {
     public func generateHeuristicPlan(
         from description: String,
         startDate: Date,
+        targetEndDate: Date? = nil,
         calendar: Calendar = .current
     ) -> [GeneratedTaskPayload] {
         let lines = description.components(separatedBy: .newlines)
@@ -151,7 +177,28 @@ public final class TaskDecompositionService: Sendable {
             ]
         }
 
-        return buildTaskPayloads(from: subtasks, startingAt: startDate, calendar: calendar)
+        return buildTaskPayloads(from: subtasks, startingAt: startDate, targetEndDate: targetEndDate, calendar: calendar)
+    }
+
+    /// Descompone una tarea grande en un conjunto de subtareas accionables y más pequeñas.
+    public func decomposeTaskIntoSubtasks(
+        taskTitle: String,
+        taskNotes: String = "",
+        estimatedHours: Double
+    ) -> [(title: String, hours: Double)] {
+        let cleanTitle = taskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let totalHours = max(1.0, estimatedHours)
+
+        // Generar desglose lógico según la naturaleza de la tarea
+        let step1Hours = max(0.5, round((totalHours * 0.25) * 2) / 2)
+        let step2Hours = max(0.5, round((totalHours * 0.50) * 2) / 2)
+        let step3Hours = max(0.5, max(0.5, totalHours - step1Hours - step2Hours))
+
+        return [
+            ("Definición y preparación: \(cleanTitle)", step1Hours),
+            ("Desarrollo y ejecución principal", step2Hours),
+            ("Revisión, pruebas y validación", step3Hours)
+        ]
     }
 }
 
@@ -163,6 +210,7 @@ public struct GeneratedTaskPayload: Sendable {
     public var endDate: Date
     public var estimatedDays: Int
     public var sortOrder: Int
+    public var subtasks: [(title: String, hours: Double)]
 
     public init(
         title: String,
@@ -170,7 +218,8 @@ public struct GeneratedTaskPayload: Sendable {
         startDate: Date,
         endDate: Date,
         estimatedDays: Int,
-        sortOrder: Int
+        sortOrder: Int,
+        subtasks: [(title: String, hours: Double)] = []
     ) {
         self.title = title
         self.notes = notes
@@ -178,5 +227,6 @@ public struct GeneratedTaskPayload: Sendable {
         self.endDate = endDate
         self.estimatedDays = estimatedDays
         self.sortOrder = sortOrder
+        self.subtasks = subtasks
     }
 }

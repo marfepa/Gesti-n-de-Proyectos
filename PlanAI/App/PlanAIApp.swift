@@ -9,7 +9,8 @@ struct PlanAIApp: App {
         do {
             let schema = Schema([
                 Project.self,
-                ProjectTask.self
+                ProjectTask.self,
+                WorkSlot.self
             ])
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             sharedModelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
