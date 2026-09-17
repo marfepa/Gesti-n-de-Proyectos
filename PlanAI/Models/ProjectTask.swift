@@ -16,6 +16,9 @@ public final class ProjectTask: Identifiable {
     
     public var project: Project?
 
+    @Relationship(deleteRule: .cascade, inverse: \ProjectSubtask.task)
+    public var subtasks: [ProjectSubtask] = []
+
     public init(
         id: UUID = UUID(),
         title: String,
@@ -40,6 +43,7 @@ public final class ProjectTask: Identifiable {
         self.sortOrder = sortOrder
         self.scheduledDate = scheduledDate
         self.project = project
+        self.subtasks = []
     }
 
     /// Duración calculada en días entre la fecha de inicio y fin.
@@ -55,5 +59,30 @@ public final class ProjectTask: Identifiable {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: startDate, to: endDate)
+    }
+
+    /// Subtareas ordenadas según su orden de visualización.
+    public var sortedSubtasks: [ProjectSubtask] {
+        subtasks.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    /// Detecta si la tarea es de gran envergadura (más de 6 horas o más de 2 días de duración).
+    public var isLargeTask: Bool {
+        estimatedHours >= 6.0 || durationInDays >= 2
+    }
+
+    /// Progreso de las subtareas de 0.0 a 1.0 (si no tiene subtareas devuelve 1.0 si completada, 0.0 si no).
+    public var subtasksProgress: Double {
+        guard !subtasks.isEmpty else { return isCompleted ? 1.0 : 0.0 }
+        let completed = subtasks.filter { $0.isCompleted }.count
+        return Double(completed) / Double(subtasks.count)
+    }
+
+    /// Total de horas estimadas considerando subtareas si existen.
+    public var effectiveEstimatedHours: Double {
+        if subtasks.isEmpty {
+            return estimatedHours
+        }
+        return subtasks.reduce(0.0) { $0 + $1.estimatedHours }
     }
 }

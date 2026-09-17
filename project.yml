@@ -25,7 +25,8 @@ targets:
     settings:
       base:
         PRODUCT_NAME: PlanAI
-        PRODUCT_BUNDLE_IDENTIFIER: com.planai.app
+        PRODUCT_MODULE_NAME: PlanAICore
+        DEFINES_MODULE: YES
         INFOPLIST_FILE: PlanAI/Info.plist
         CODE_SIGN_ENTITLEMENTS: PlanAI/PlanAI.entitlements
         CODE_SIGN_IDENTITY: "-"
@@ -47,3 +48,6 @@ targets:
       - path: Tests/PlanAITests
     dependencies:
       - target: PlanAI
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
