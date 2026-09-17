@@ -188,7 +188,12 @@ public struct WeeklyScheduleView: View {
 
                                                 VStack(spacing: 6) {
                                                     ForEach(group.items) { item in
-                                                        ScheduledItemCard(item: item)
+                                                        ScheduledItemCard(
+                                                            item: item,
+                                                            onToggleComplete: {
+                                                                toggleItemCompletion(item)
+                                                            }
+                                                        )
                                                     }
                                                 }
                                             }
@@ -201,7 +206,10 @@ public struct WeeklyScheduleView: View {
                                 WeeklyScheduleGridView(
                                     result: result,
                                     workSlots: workSlots,
-                                    startDate: Date()
+                                    startDate: Date(),
+                                    onToggleItem: { item in
+                                        toggleItemCompletion(item)
+                                    }
                                 )
 
                             case .monthlyGrid:
@@ -237,6 +245,12 @@ public struct WeeklyScheduleView: View {
                 runOptimization()
             }
         }
+        .onChange(of: projects) { _, _ in
+            runOptimization()
+        }
+        .onChange(of: workSlots) { _, _ in
+            runOptimization()
+        }
     }
 
     // MARK: - Subvistas
@@ -245,10 +259,20 @@ public struct WeeklyScheduleView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Plan de Avance Seguro"))
-                        .font(.title3)
-                        .fontWeight(.bold)
-                    Text(String(format: String(localized: "Capacidad neta: %.1fh | Demanda: %.1fh"), result.totalAvailableHours, result.totalDemandHours))
+                    HStack(spacing: 6) {
+                        Text(String(localized: "Plan de Avance Seguro"))
+                            .font(.title3)
+                            .fontWeight(.bold)
+
+                        Text(String(format: "Aprovechamiento: %.0f%%", result.slotUtilization * 100.0))
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.12))
+                            .foregroundStyle(.blue)
+                            .clipShape(Capsule())
+                    }
+                    Text(String(format: String(localized: "Capacidad neta: %.1fh | Demanda: %.1fh | Asignadas: %.1fh"), result.totalAvailableHours, result.totalDemandHours, result.totalAllocatedHours))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -340,6 +364,37 @@ public struct WeeklyScheduleView: View {
         runOptimization()
     }
 
+    private func toggleItemCompletion(_ item: ScheduledItem) {
+        // Buscar el proyecto y la tarea o subtarea correspondiente
+        for project in projects {
+            for task in project.tasks {
+                if let subId = item.subtaskId, let sub = task.subtasks.first(where: { $0.id == subId }) {
+                    sub.isCompleted.toggle()
+                    let allCompleted = task.subtasks.allSatisfy { $0.isCompleted }
+                    if allCompleted && !task.subtasks.isEmpty {
+                        task.isCompleted = true
+                    } else if !sub.isCompleted {
+                        task.isCompleted = false
+                    }
+                    try? modelContext.save()
+                    runOptimization()
+                    return
+                } else if task.id == item.taskId {
+                    task.isCompleted.toggle()
+                    // Si tiene subtareas y se completa la tarea madre, marcar todas las subtareas también
+                    if task.isCompleted {
+                        for s in task.subtasks {
+                            s.isCompleted = true
+                        }
+                    }
+                    try? modelContext.save()
+                    runOptimization()
+                    return
+                }
+            }
+        }
+    }
+
     private struct DateGroup {
         let date: Date
         let dateFormatted: String
@@ -406,24 +461,46 @@ struct WorkSlotRow: View {
 // MARK: - Tarjeta de Tarea Asignada
 struct ScheduledItemCard: View {
     let item: ScheduledItem
+    var onToggleComplete: () -> Void = {}
 
     var body: some View {
-        HStack {
+        HStack(spacing: 10) {
+            Button(action: onToggleComplete) {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(item.isCompleted ? .green : .secondary)
+                    .font(.title3)
+            }
+            .buttonStyle(.plain)
+            .help(String(localized: "Marcar completada para liberar el hueco inmediatamente"))
+
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Text(item.projectName)
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundStyle(.blue)
+
+                    if item.subtaskId != nil {
+                        Text("Subtarea")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.purple.opacity(0.12))
+                            .foregroundStyle(.purple)
+                            .clipShape(Capsule())
+                    }
+
                     Spacer()
                     Text(item.timeRangeFormatted)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
-                Text(item.taskTitle)
+                Text(item.displayTitle)
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .strikethrough(item.isCompleted, color: .secondary)
+                    .foregroundStyle(item.isCompleted ? .secondary : .primary)
             }
 
             Spacer()

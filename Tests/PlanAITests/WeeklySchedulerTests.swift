@@ -274,8 +274,116 @@ final class WeeklySchedulerTests: XCTestCase {
             calendar: calendar
         )
 
-        // La demanda efectiva debe ser 3.0h (la suma de subtareas), no 10.0h
+        // La demanda efectiva debe ser 3.0h (la suma de subtareas: 1.5 + 1.5), no 10.0h
         XCTAssertEqual(result.totalDemandHours, 3.0)
-        XCTAssertEqual(result.scheduledItems.first?.allocatedHours, 3.0)
+        XCTAssertEqual(result.scheduledItems.count, 2)
+        XCTAssertEqual(result.scheduledItems[0].subtaskTitle, "Sub 1")
+        XCTAssertEqual(result.scheduledItems[0].allocatedHours, 1.5)
+        XCTAssertEqual(result.scheduledItems[1].subtaskTitle, "Sub 2")
+        XCTAssertEqual(result.scheduledItems[1].allocatedHours, 1.5)
+    }
+
+    func testDynamicSlotReallocationWhenTaskCompletedEarly() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
+
+        let projA = Project(name: "Proyecto A", startDate: refDate, priority: .alta)
+        let taskA = ProjectTask(title: "Tarea Urgente A", startDate: refDate, endDate: refDate, estimatedHours: 2.0, project: projA)
+        projA.tasks = [taskA]
+
+        let projB = Project(name: "Proyecto B", startDate: refDate, priority: .media)
+        let taskB = ProjectTask(title: "Tarea Pendiente B", startDate: refDate, endDate: refDate, estimatedHours: 2.0, project: projB)
+        projB.tasks = [taskB]
+
+        // Solo 2 horas disponibles en total: Lunes 9:00 - 11:00
+        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 11 * 60)
+
+        // Estado inicial: Tarea A ocupa todo el hueco de 9:00 a 11:00, Tarea B queda unscheduled
+        let initialResult = service.schedule(
+            projects: [projA, projB],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(initialResult.scheduledItems.count, 1)
+        XCTAssertEqual(initialResult.scheduledItems.first?.taskTitle, "Tarea Urgente A")
+        XCTAssertEqual(initialResult.scheduledItems.first?.startMinute, 9 * 60)
+        XCTAssertEqual(initialResult.scheduledItems.first?.endMinute, 11 * 60)
+        XCTAssertEqual(initialResult.unscheduledTasks.count, 1)
+        XCTAssertEqual(initialResult.unscheduledTasks.first?.taskTitle, "Tarea Pendiente B")
+
+        // Simulamos que Tarea A se completa antes de tiempo
+        taskA.isCompleted = true
+
+        // Al recalcular, Tarea B debe ocupar inmediatamente el hueco liberado de 9:00 a 11:00
+        let reallocatedResult = service.schedule(
+            projects: [projA, projB],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(reallocatedResult.scheduledItems.count, 1)
+        XCTAssertEqual(reallocatedResult.scheduledItems.first?.taskTitle, "Tarea Pendiente B")
+        XCTAssertEqual(reallocatedResult.scheduledItems.first?.projectName, "Proyecto B")
+        XCTAssertEqual(reallocatedResult.scheduledItems.first?.startMinute, 9 * 60)
+        XCTAssertEqual(reallocatedResult.scheduledItems.first?.endMinute, 11 * 60)
+        XCTAssertTrue(reallocatedResult.unscheduledTasks.isEmpty)
+    }
+
+    func testMultiProjectContinuousPackingOptimizesAvailableSlots() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
+
+        // Proyecto 1: 1.5 horas
+        let p1 = Project(name: "P1", startDate: refDate, priority: .alta)
+        let t1 = ProjectTask(title: "Task 1", startDate: refDate, endDate: refDate, estimatedHours: 1.5, project: p1)
+        p1.tasks = [t1]
+
+        // Proyecto 2: 2.0 horas
+        let p2 = Project(name: "P2", startDate: refDate, priority: .media)
+        let t2 = ProjectTask(title: "Task 2", startDate: refDate, endDate: refDate, estimatedHours: 2.0, project: p2)
+        p2.tasks = [t2]
+
+        // Proyecto 3: 0.5 horas
+        let p3 = Project(name: "P3", startDate: refDate, priority: .baja)
+        let t3 = ProjectTask(title: "Task 3", startDate: refDate, endDate: refDate, estimatedHours: 0.5, project: p3)
+        p3.tasks = [t3]
+
+        // Bloque de 4 horas exactas (9:00 - 13:00)
+        let slot = WorkSlot(weekday: 2, startMinute: 9 * 60, endMinute: 13 * 60)
+
+        let result = service.schedule(
+            projects: [p3, p1, p2], // Desordenados
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        // Comprobación de empaquetado continuo óptimo
+        XCTAssertEqual(result.totalAllocatedHours, 4.0)
+        XCTAssertEqual(result.slotUtilization, 1.0)
+        XCTAssertTrue(result.unscheduledTasks.isEmpty)
+
+        // Las tareas deben ordenarse por prioridad: P1 (alta), luego P2 (media), luego P3 (baja)
+        XCTAssertEqual(result.scheduledItems.count, 3)
+        XCTAssertEqual(result.scheduledItems[0].projectName, "P1")
+        XCTAssertEqual(result.scheduledItems[0].startMinute, 9 * 60)
+        XCTAssertEqual(result.scheduledItems[0].endMinute, 9 * 60 + 90) // 9:00 - 10:30
+
+        XCTAssertEqual(result.scheduledItems[1].projectName, "P2")
+        XCTAssertEqual(result.scheduledItems[1].startMinute, 9 * 60 + 90) // 10:30
+        XCTAssertEqual(result.scheduledItems[1].endMinute, 9 * 60 + 210) // 10:30 - 12:30
+
+        XCTAssertEqual(result.scheduledItems[2].projectName, "P3")
+        XCTAssertEqual(result.scheduledItems[2].startMinute, 9 * 60 + 210) // 12:30
+        XCTAssertEqual(result.scheduledItems[2].endMinute, 13 * 60) // 12:30 - 13:00
     }
 }

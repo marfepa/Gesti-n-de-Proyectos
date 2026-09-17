@@ -5,6 +5,7 @@ public struct WeeklyScheduleGridView: View {
     public let result: ScheduleResult
     public let workSlots: [WorkSlot]
     public let startDate: Date
+    public var onToggleItem: (ScheduledItem) -> Void = { _ in }
 
     private let startHourOfDay: Int = 8
     private let endHourOfDay: Int = 22
@@ -20,10 +21,16 @@ public struct WeeklyScheduleGridView: View {
         (1, "Domingo")
     ]
 
-    public init(result: ScheduleResult, workSlots: [WorkSlot], startDate: Date = Date()) {
+    public init(
+        result: ScheduleResult,
+        workSlots: [WorkSlot],
+        startDate: Date = Date(),
+        onToggleItem: @escaping (ScheduledItem) -> Void = { _ in }
+    ) {
         self.result = result
         self.workSlots = workSlots
         self.startDate = startDate
+        self.onToggleItem = onToggleItem
     }
 
     public var body: some View {
@@ -122,10 +129,15 @@ public struct WeeklyScheduleGridView: View {
                                 let durationMin = max(15, item.endMinute - item.startMinute)
                                 let height = heightForMinutes(durationMin)
 
-                                ScheduledItemGridBlock(item: item)
-                                    .frame(height: max(22, height - 2))
-                                    .offset(y: topOffset + 1)
-                                    .padding(.horizontal, 4)
+                                ScheduledItemGridBlock(
+                                    item: item,
+                                    onToggle: {
+                                        onToggleItem(item)
+                                    }
+                                )
+                                .frame(height: max(22, height - 2))
+                                .offset(y: topOffset + 1)
+                                .padding(.horizontal, 4)
                             }
                         }
                         .frame(minWidth: 140, maxWidth: .infinity)
@@ -158,35 +170,47 @@ public struct WeeklyScheduleGridView: View {
 /// Bloque interactivo y estilizado para una tarea asignada en la rejilla
 struct ScheduledItemGridBlock: View {
     let item: ScheduledItem
+    var onToggle: () -> Void = {}
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(priorityColor(item.projectPriority))
-                    .frame(width: 6, height: 6)
-
-                Text(item.projectName)
-                    .font(.system(size: 9, weight: .bold))
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-
-                Spacer(minLength: 0)
-
-                Text(String(format: "%.1fh", item.allocatedHours))
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 4) {
+            Button(action: onToggle) {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 10))
+                    .foregroundStyle(item.isCompleted ? .green : .secondary)
             }
+            .buttonStyle(.plain)
+            .padding(.top, 1)
 
-            Text(item.taskTitle)
-                .font(.system(size: 10, weight: .medium))
-                .lineLimit(2)
-                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(priorityColor(item.projectPriority))
+                        .frame(width: 6, height: 6)
 
-            Text(item.timeRangeFormatted)
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+                    Text(item.projectName)
+                        .font(.system(size: 9, weight: .bold))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 0)
+
+                    Text(String(format: "%.1fh", item.allocatedHours))
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(item.displayTitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .strikethrough(item.isCompleted, color: .secondary)
+                    .foregroundStyle(item.isCompleted ? .secondary : .primary)
+                    .lineLimit(2)
+
+                Text(item.timeRangeFormatted)
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .padding(4)
         .background(
@@ -198,7 +222,7 @@ struct ScheduledItemGridBlock: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(priorityColor(item.projectPriority).opacity(0.4), lineWidth: 1)
         )
-        .help("\(item.projectName): \(item.taskTitle) (\(item.timeRangeFormatted))")
+        .help("\(item.projectName): \(item.displayTitle) (\(item.timeRangeFormatted)) - Clic para marcar completada")
     }
 
     private func priorityColor(_ priority: ProjectPriority) -> Color {
