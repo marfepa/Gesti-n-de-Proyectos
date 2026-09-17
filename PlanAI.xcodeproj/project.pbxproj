@@ -18,6 +18,7 @@
 		352EF1C4BE62E5BB98962ADE /* WeeklySchedulerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C414308B6A033F8DE2D18545 /* WeeklySchedulerService.swift */; };
 		383C8C529EC973108CA73156 /* ProjectEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFC80562BCA6CEA19E8D009 /* ProjectEditSheet.swift */; };
 		469BBCBCC433C985A3737B8E /* WeeklySchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF65DF172C933CE3C77184D5 /* WeeklySchedulerTests.swift */; };
+		5F70E321C04814A67EF106CB /* ScheduledItemDetailPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FF3A917AF7D60A9DBB7A74A /* ScheduledItemDetailPopover.swift */; };
 		678A518A9E7A420F8BAAE5E1 /* ProjectSubtask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DCC5F228AE560C2FEBD159D /* ProjectSubtask.swift */; };
 		709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */; };
 		813D84FFABF59FC44D7EE125 /* ProjectInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5487C1BEB5E269B777A4877A /* ProjectInputView.swift */; };
@@ -51,6 +52,7 @@
 		0D95202D689690C6C712033E /* AudioTranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTranscriptionService.swift; sourceTree = "<group>"; };
 		0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViewModel.swift; sourceTree = "<group>"; };
 		198099C7483DDD050D604FDF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2FF3A917AF7D60A9DBB7A74A /* ScheduledItemDetailPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledItemDetailPopover.swift; sourceTree = "<group>"; };
 		3DCC5F228AE560C2FEBD159D /* ProjectSubtask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSubtask.swift; sourceTree = "<group>"; };
 		4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditSheet.swift; sourceTree = "<group>"; };
 		5487C1BEB5E269B777A4877A /* ProjectInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInputView.swift; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 				F2C3EC05C7DDD2EA8250D2E6 /* ProjectDetailView.swift */,
 				EEFC80562BCA6CEA19E8D009 /* ProjectEditSheet.swift */,
 				5487C1BEB5E269B777A4877A /* ProjectInputView.swift */,
+				2FF3A917AF7D60A9DBB7A74A /* ScheduledItemDetailPopover.swift */,
 				4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */,
 				6519F9C103F89FC2055344A7 /* TaskListView.swift */,
 				82A3919FD088AABA87861C27 /* WeeklyScheduleGridView.swift */,
@@ -328,6 +331,7 @@
 				678A518A9E7A420F8BAAE5E1 /* ProjectSubtask.swift in Sources */,
 				F2BED910A196DBAF3808C164 /* ProjectTask.swift in Sources */,
 				709DF6ACA51C77290978F9BF /* ProjectViewModel.swift in Sources */,
+				5F70E321C04814A67EF106CB /* ScheduledItemDetailPopover.swift in Sources */,
 				24742F34ED6B32E12CB4481D /* TaskDecompositionService.swift in Sources */,
 				E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */,
 				1E15D36797489A41A4FDD70A /* TaskListView.swift in Sources */,
