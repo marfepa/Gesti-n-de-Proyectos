@@ -30,6 +30,7 @@
 		B79EF63F8A19517E9ADD6BE2 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = C6151A7E6B60A91DC3BEFCF5 /* Localizable.strings */; };
 		DD60F735C903B4247748A97F /* WeeklyScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8A55FDFD5E31730819A7A1D /* WeeklyScheduleView.swift */; };
 		E129FCB7346DDA6C4E0DC701 /* TaskEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */; };
+		EE86465472AFB4EBE823118C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3AA8FB98C3B572D3E4D66AB9 /* Assets.xcassets */; };
 		EFC64112F1F8FB63D8177C7C /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5CDFD9DAE28D9627B7F0CE /* Project.swift */; };
 		F2BED910A196DBAF3808C164 /* ProjectTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769D313F968862C918E89E87 /* ProjectTask.swift */; };
 		F46451CAC188EAC98822A413 /* WeeklyScheduleGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82A3919FD088AABA87861C27 /* WeeklyScheduleGridView.swift */; };
@@ -53,6 +54,7 @@
 		0D9F8D31534BB2BA4A4AEBB9 /* ProjectViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectViewModel.swift; sourceTree = "<group>"; };
 		198099C7483DDD050D604FDF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2FF3A917AF7D60A9DBB7A74A /* ScheduledItemDetailPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledItemDetailPopover.swift; sourceTree = "<group>"; };
+		3AA8FB98C3B572D3E4D66AB9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3DCC5F228AE560C2FEBD159D /* ProjectSubtask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSubtask.swift; sourceTree = "<group>"; };
 		4DCA9E9525D7450D377DF116 /* TaskEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskEditSheet.swift; sourceTree = "<group>"; };
 		5487C1BEB5E269B777A4877A /* ProjectInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInputView.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 		EE1923AE62C413F14A7D3800 /* PlanAI */ = {
 			isa = PBXGroup;
 			children = (
+				3AA8FB98C3B572D3E4D66AB9 /* Assets.xcassets */,
 				198099C7483DDD050D604FDF /* Info.plist */,
 				FDE6984013676CCBDF00DCEC /* PlanAI.entitlements */,
 				1117E5F43674584105F6086C /* App */,
@@ -294,6 +297,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE86465472AFB4EBE823118C /* Assets.xcassets in Resources */,
 				B79EF63F8A19517E9ADD6BE2 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
