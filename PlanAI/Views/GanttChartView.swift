@@ -207,7 +207,11 @@ public struct GanttChartView: View {
                         ScrollView(.horizontal) {
                             VStack(alignment: .leading, spacing: 0) {
                                 // Regla temporal superior (Ticks semanales / fechas)
-                                ZStack(alignment: .bottomLeading) {
+                                ZStack(alignment: .topLeading) {
+                                    // Ancla el ZStack al ancho completo del timeline
+                                    Color.clear
+                                        .frame(width: contentWidth, height: 32)
+
                                     ForEach(scale.ticks, id: \.self) { tick in
                                         let x = scale.xPosition(for: tick, totalWidth: contentWidth)
                                         VStack(alignment: .leading, spacing: 2) {
@@ -228,12 +232,16 @@ public struct GanttChartView: View {
                                 // Filas de barras de tareas
                                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                     ZStack(alignment: .leading) {
+                                        // Ancla el ZStack al ancho completo — sin esto offset(x:) no funciona desde el borde izquierdo real
+                                        Color.clear
+                                            .frame(width: contentWidth, height: rowHeight)
+
                                         // Líneas verticales de rejilla
                                         ForEach(scale.ticks, id: \.self) { tick in
                                             let x = scale.xPosition(for: tick, totalWidth: contentWidth)
                                             Rectangle()
                                                 .fill(Color.gray.opacity(0.12))
-                                                .frame(width: 1)
+                                                .frame(width: 1, height: rowHeight)
                                                 .offset(x: x)
                                         }
 
@@ -242,7 +250,7 @@ public struct GanttChartView: View {
                                             let todayX = scale.xPosition(for: scale.today, totalWidth: contentWidth)
                                             Rectangle()
                                                 .fill(Color.red.opacity(0.6))
-                                                .frame(width: 1.5)
+                                                .frame(width: 1.5, height: rowHeight)
                                                 .offset(x: todayX)
                                         }
 
