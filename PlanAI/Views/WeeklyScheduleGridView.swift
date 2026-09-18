@@ -55,43 +55,73 @@ public struct WeeklyScheduleGridView: View {
         self.onEditTask = onEditTask
     }
 
+    /// Las 7 fechas reales de la semana a partir del lunes (startDate).
+    private var weekDates: [Date] {
+        let calendar = Calendar.current
+        let monday = calendar.startOfDay(for: startDate)
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: monday) }
+    }
+
+    private var today: Date {
+        Calendar.current.startOfDay(for: Date())
+    }
+
     public var body: some View {
         ScrollView([.horizontal, .vertical]) {
             VStack(alignment: .leading, spacing: 0) {
-                // Cabecera con días de la semana
+                // ── Cabecera: nombre del día + número del mes ─────────────────
                 HStack(spacing: 0) {
                     Text("Hora")
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundStyle(.secondary)
-                        .frame(width: 55, height: 32)
+                        .frame(width: 55, height: 52)
                         .background(Color(nsColor: .controlBackgroundColor))
 
-                    ForEach(dayNames, id: \.0) { day in
+                    ForEach(Array(weekDates.enumerated()), id: \.offset) { offset, date in
+                        let isToday = Calendar.current.isDate(date, inSameDayAs: today)
+                        let dayName = dayNames[offset].1
+                        let dayNumber = Calendar.current.component(.day, from: date)
+                        let monthAbbr = date.formatted(.dateTime.month(.abbreviated).locale(Locale(identifier: "es_ES")))
+
                         VStack(spacing: 2) {
-                            Text(day.1)
+                            Text(dayName)
                                 .font(.subheadline)
-                                .fontWeight(.semibold)
+                                .fontWeight(isToday ? .bold : .semibold)
+                                .foregroundStyle(isToday ? .blue : .primary)
+
+                            // Círculo azul relleno en el día actual
+                            ZStack {
+                                if isToday {
+                                    Circle()
+                                        .fill(Color.blue)
+                                        .frame(width: 26, height: 26)
+                                }
+                                Text("\(dayNumber)")
+                                    .font(.system(size: 13, weight: isToday ? .bold : .regular))
+                                    .foregroundStyle(isToday ? .white : .primary)
+                            }
+
+                            Text(monthAbbr)
+                                .font(.system(size: 9))
+                                .foregroundStyle(isToday ? .blue : .secondary)
                         }
                         .frame(minWidth: 160, maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background(Color(nsColor: .controlBackgroundColor))
+                        .frame(height: 52)
+                        .background(isToday ? Color.blue.opacity(0.07) : Color(nsColor: .controlBackgroundColor))
                         .overlay(
                             Rectangle()
                                 .frame(width: 1)
-                                .foregroundStyle(Color.gray.opacity(0.2)),
+                                .foregroundStyle(isToday ? Color.blue.opacity(0.25) : Color.gray.opacity(0.2)),
                             alignment: .trailing
                         )
                     }
                 }
-                .overlay(
-                    Divider(),
-                    alignment: .bottom
-                )
+                .overlay(Divider(), alignment: .bottom)
 
-                // Contenido de la cuadrícula: Horas vs Días
+                // ── Cuadrícula: Horas vs Días ─────────────────────────────────
                 HStack(alignment: .top, spacing: 0) {
-                    // Columna de Horas
+                    // Columna de horas
                     VStack(spacing: 0) {
                         ForEach(startHourOfDay..<endHourOfDay, id: \.self) { hour in
                             Text(String(format: "%02d:00", hour))
@@ -99,44 +129,46 @@ public struct WeeklyScheduleGridView: View {
                                 .foregroundStyle(.secondary)
                                 .frame(width: 55, height: hourRowHeight, alignment: .top)
                                 .padding(.top, 4)
-                                .overlay(
-                                    Divider(),
-                                    alignment: .bottom
-                                )
+                                .overlay(Divider(), alignment: .bottom)
                         }
                     }
                     .background(Color(nsColor: .windowBackgroundColor).opacity(0.5))
 
-                    // Columnas de Días
-                    ForEach(dayNames, id: \.0) { day in
-                        let weekdayNumber = day.0
-                        let slotsForDay = workSlots.filter { $0.isEnabled && $0.weekday == weekdayNumber }
+                    // Columnas de días con fechas reales
+                    ForEach(Array(weekDates.enumerated()), id: \.offset) { offset, date in
                         let calendar = Calendar.current
+                        let isToday = calendar.isDate(date, inSameDayAs: today)
+                        let weekdayNumber = dayNames[offset].0
+                        let slotsForDay = workSlots.filter { $0.isEnabled && $0.weekday == weekdayNumber }
+
+                        // Filtrar por fecha exacta — no por weekday abstracto
                         let itemsForDay = result.scheduledItems.filter {
-                            calendar.component(.weekday, from: $0.date) == weekdayNumber
+                            calendar.isDate($0.date, inSameDayAs: date)
                         }
                         let positionedItems = layoutParallelColumns(for: itemsForDay)
 
                         ZStack(alignment: .topLeading) {
-                            // Líneas divisorias horizontales por cada hora
+                            // Fondo suave de resaltado para hoy
+                            if isToday {
+                                Color.blue.opacity(0.04)
+                            }
+
+                            // Líneas horizontales por hora
                             VStack(spacing: 0) {
                                 ForEach(startHourOfDay..<endHourOfDay, id: \.self) { _ in
                                     Rectangle()
                                         .fill(Color.clear)
                                         .frame(height: hourRowHeight)
-                                        .overlay(
-                                            Divider().opacity(0.6),
-                                            alignment: .bottom
-                                        )
+                                        .overlay(Divider().opacity(0.6), alignment: .bottom)
                                 }
                             }
 
-                            // Fondo para bloques disponibles (WorkSlots)
+                            // Bloques disponibles (WorkSlots)
                             ForEach(slotsForDay) { slot in
                                 let topOffset = offsetForMinute(slot.startMinute)
                                 let height = heightForMinutes(slot.durationMinutes)
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.blue.opacity(0.06))
+                                    .fill(isToday ? Color.blue.opacity(0.10) : Color.blue.opacity(0.06))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 6)
                                             .strokeBorder(Color.blue.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -146,7 +178,7 @@ public struct WeeklyScheduleGridView: View {
                                     .padding(.horizontal, 2)
                             }
 
-                            // Tareas asignadas dentro de los bloques con columnas paralelas
+                            // Tareas asignadas con layout de columnas paralelas
                             GeometryReader { colGeo in
                                 let availableWidth = colGeo.size.width
                                 ForEach(positionedItems) { positioned in
@@ -154,19 +186,14 @@ public struct WeeklyScheduleGridView: View {
                                     let topOffset = offsetForMinute(item.startMinute)
                                     let durationMin = max(15, item.endMinute - item.startMinute)
                                     let height = heightForMinutes(durationMin)
-
                                     let totalCols = max(1, positioned.totalColumns)
                                     let colWidth = (availableWidth - 8.0) / CGFloat(totalCols)
                                     let xOffset = 4.0 + CGFloat(positioned.columnIndex) * colWidth
 
                                     ScheduledItemGridBlock(
                                         item: item,
-                                        onToggle: {
-                                            onToggleItem(item)
-                                        },
-                                        onSelect: {
-                                            selectedItem = item
-                                        }
+                                        onToggle: { onToggleItem(item) },
+                                        onSelect: { selectedItem = item }
                                     )
                                     .frame(width: max(40, colWidth - 4), height: max(24, height - 2))
                                     .offset(x: xOffset, y: topOffset + 1)
@@ -177,8 +204,8 @@ public struct WeeklyScheduleGridView: View {
                         .frame(height: CGFloat(endHourOfDay - startHourOfDay) * hourRowHeight)
                         .overlay(
                             Rectangle()
-                                .frame(width: 1)
-                                .foregroundStyle(Color.gray.opacity(0.2)),
+                                .frame(width: isToday ? 2 : 1)
+                                .foregroundStyle(isToday ? Color.blue.opacity(0.3) : Color.gray.opacity(0.2)),
                             alignment: .trailing
                         )
                     }
@@ -192,16 +219,12 @@ public struct WeeklyScheduleGridView: View {
                 taskNotes: nil,
                 onToggle: {
                     onToggleItem(item)
-                    // Actualizar el estado local para reflejar el toggle en el popover
                     if var current = selectedItem, current.id == item.id {
                         current.isCompleted.toggle()
                         selectedItem = current
                     }
                 },
-                onEdit: {
-                    selectedItem = nil
-                    // Si se desea editar la tarea
-                }
+                onEdit: { selectedItem = nil }
             )
         }
     }

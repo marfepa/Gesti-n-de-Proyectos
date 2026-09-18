@@ -34,9 +34,35 @@ public struct WeeklyScheduleView: View {
 
     @State private var displayMode: ScheduleDisplayMode = .weeklyGrid
     @State private var showingAddSlotSheet: Bool = false
-    @State private var selectedWeeks: Int = 2
     @State private var safetyBufferPercent: Double = 0.15
     @State private var scheduleResult: ScheduleResult?
+    @State private var currentWeekStart: Date = WeeklyScheduleView.mondayOfWeek(containing: Date())
+
+    /// Devuelve el lunes de la semana que contiene la fecha dada.
+    static func mondayOfWeek(containing date: Date) -> Date {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2 // Lunes
+        let startOfDay = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: startOfDay)
+        // weekday: 1=domingo, 2=lunes, …, 7=sábado
+        let daysToMonday = (weekday + 5) % 7 // días a restar para llegar al lunes
+        return calendar.date(byAdding: .day, value: -daysToMonday, to: startOfDay) ?? startOfDay
+    }
+
+    /// Etiqueta legible del rango de la semana, ej. "17 – 23 sep 2026".
+    private var weekRangeLabel: String {
+        let calendar = Calendar.current
+        guard let sunday = calendar.date(byAdding: .day, value: 6, to: currentWeekStart) else {
+            return ""
+        }
+        let startFmt = DateFormatter()
+        startFmt.dateFormat = "d"
+        startFmt.locale = Locale(identifier: "es_ES")
+        let endFmt = DateFormatter()
+        endFmt.dateFormat = "d MMM yyyy"
+        endFmt.locale = Locale(identifier: "es_ES")
+        return "\(startFmt.string(from: currentWeekStart)) – \(endFmt.string(from: sunday))"
+    }
 
     public init() {}
 
@@ -112,20 +138,6 @@ public struct WeeklyScheduleView: View {
                         .frame(width: 80)
                     }
 
-                    HStack {
-                        Text(String(localized: "Horizonte temporal:"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Picker("", selection: $selectedWeeks) {
-                            Text("1 semana").tag(1)
-                            Text("2 semanas").tag(2)
-                            Text("4 semanas").tag(4)
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 110)
-                    }
-
                     Button(action: runOptimization) {
                         HStack {
                             Image(systemName: "sparkles")
@@ -149,12 +161,54 @@ public struct WeeklyScheduleView: View {
                     VStack(spacing: 8) {
                         diagnosticHeader(result: result)
 
-                        HStack {
+                        // Barra de controles: navegación de semana + selector de modo
+                        HStack(spacing: 12) {
+                            // Navegación entre semanas (solo visible en modo rejilla semanal)
+                            if displayMode == .weeklyGrid {
+                                HStack(spacing: 0) {
+                                    Button {
+                                        currentWeekStart = Calendar.current.date(byAdding: .weekOfYear, value: -1, to: currentWeekStart) ?? currentWeekStart
+                                    } label: {
+                                        Image(systemName: "chevron.left")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .padding(6)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Semana anterior")
+
+                                    Button {
+                                        currentWeekStart = WeeklyScheduleView.mondayOfWeek(containing: Date())
+                                    } label: {
+                                        Text(weekRangeLabel)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .frame(minWidth: 160)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Ir a la semana actual")
+
+                                    Button {
+                                        currentWeekStart = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: currentWeekStart) ?? currentWeekStart
+                                    } label: {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .padding(6)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Semana siguiente")
+                                }
+                                .background(Color(nsColor: .controlBackgroundColor))
+                                .clipShape(RoundedRectangle(cornerRadius: 7))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                )
+                            }
+
                             Spacer()
+
                             Picker("", selection: $displayMode) {
                                 ForEach(ScheduleDisplayMode.allCases) { mode in
-                                    Label(mode.localizedLabel, systemImage: mode.iconName)
-                                        .tag(mode)
+                                    Label(mode.localizedLabel, systemImage: mode.iconName).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
@@ -206,7 +260,7 @@ public struct WeeklyScheduleView: View {
                                 WeeklyScheduleGridView(
                                     result: result,
                                     workSlots: workSlots,
-                                    startDate: Date(),
+                                    startDate: currentWeekStart,
                                     onToggleItem: { item in
                                         toggleItemCompletion(item)
                                     }
@@ -336,7 +390,7 @@ public struct WeeklyScheduleView: View {
             projects: projects,
             slots: workSlots,
             startDate: Date(),
-            weeksToSchedule: selectedWeeks,
+            weeksToSchedule: 8, // Cubre el horizonte completo sin necesitar selector
             safetyBufferPercent: safetyBufferPercent
         )
     }
