@@ -12,18 +12,47 @@ public struct ContentView: View {
     public var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
-                // Lista de proyectos
-                List(selection: $viewModel.selectedProject) {
+                List {
+                    Section {
+                        Button {
+                            viewModel.activeTab = .weeklySchedule
+                        } label: {
+                            HStack {
+                                Label(String(localized: "Planificador Semanal"), systemImage: "calendar.badge.clock")
+                                    .foregroundStyle(viewModel.activeTab == .weeklySchedule ? .blue : .primary)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 2)
+                    }
+
                     Section(header: Text(String(localized: "Proyectos"))) {
                         ForEach(projects) { project in
-                            NavigationLink(value: project) {
+                            Button {
+                                viewModel.selectedProject = project
+                                viewModel.activeTab = .projects
+                            } label: {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(project.name)
                                             .font(.body)
                                             .fontWeight(.medium)
+                                            .foregroundStyle(viewModel.activeTab == .projects && viewModel.selectedProject?.id == project.id ? .blue : .primary)
 
                                         HStack(spacing: 8) {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: project.priority.iconName)
+                                                Text(project.priority.title)
+                                            }
+                                            .font(.caption2)
+                                            .foregroundStyle(priorityColor(project.priority))
+
+                                            Text("•")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+
                                             Text("\(project.tasks.count) " + String(localized: "tareas"))
                                                 .font(.caption2)
                                                 .foregroundStyle(.secondary)
@@ -40,7 +69,9 @@ public struct ContentView: View {
 
                                     Spacer()
                                 }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                             .contextMenu {
                                 Button(role: .destructive, action: {
                                     viewModel.deleteProject(project, context: modelContext)
@@ -72,7 +103,9 @@ public struct ContentView: View {
                 }
             }
         } detail: {
-            if let selected = viewModel.selectedProject {
+            if viewModel.activeTab == .weeklySchedule {
+                WeeklyScheduleView()
+            } else if let selected = viewModel.selectedProject {
                 ProjectDetailView(project: selected, viewModel: viewModel)
             } else {
                 ContentUnavailableView(
@@ -97,6 +130,15 @@ public struct ContentView: View {
         for index in offsets {
             let project = projects[index]
             viewModel.deleteProject(project, context: modelContext)
+        }
+    }
+
+    private func priorityColor(_ priority: ProjectPriority) -> Color {
+        switch priority {
+        case .baja: return .secondary
+        case .media: return .blue
+        case .alta: return .orange
+        case .urgente: return .red
         }
     }
 }

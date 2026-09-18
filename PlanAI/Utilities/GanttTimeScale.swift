@@ -86,4 +86,30 @@ public struct GanttTimeScale: Sendable, Equatable {
 
         return result
     }
+
+    /// Calcula la posición horizontal en píxeles para una fecha determinada dentro del ancho total disponible.
+    public func xPosition(for date: Date, totalWidth: CGFloat) -> CGFloat {
+        guard totalWidth > 0 else { return 0 }
+        let totalDuration = endDate.timeIntervalSince(startDate)
+        guard totalDuration > 0 else { return 0 }
+        let elapsed = date.timeIntervalSince(startDate)
+        let ratio = max(0.0, min(1.0, elapsed / totalDuration))
+        return CGFloat(ratio) * totalWidth
+    }
+
+    /// Convierte una coordenada X en píxeles a la fecha correspondiente en el dominio.
+    public func date(forX x: CGFloat, totalWidth: CGFloat) -> Date {
+        guard totalWidth > 0 else { return startDate }
+        let totalDuration = endDate.timeIntervalSince(startDate)
+        let ratio = max(0.0, min(1.0, Double(x / totalWidth)))
+        return startDate.addingTimeInterval(ratio * totalDuration)
+    }
+
+    /// Redondea una fecha al inicio del día más cercano.
+    public func snapToDay(_ date: Date, calendar: Calendar = .current) -> Date {
+        let startOfDay = calendar.startOfDay(for: date)
+        let nextDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+        let midDay = startOfDay.addingTimeInterval(12 * 3600)
+        return date >= midDay ? nextDay : startOfDay
+    }
 }

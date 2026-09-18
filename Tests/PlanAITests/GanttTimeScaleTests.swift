@@ -158,4 +158,43 @@ final class GanttTimeScaleTests: XCTestCase {
             XCTAssertEqual(diff, 7, "Cada tick consecutivo debe estar separado por exactamente 7 días")
         }
     }
+
+    func testPixelConversionsAndSnapToDay() {
+        let calendar = fixedCalendar
+        let start = makeDate(year: 2026, month: 11, day: 1)
+        let end = makeDate(year: 2026, month: 11, day: 11) // 10 días de diferencia
+        let scale = GanttTimeScale(dates: [start, end], calendar: calendar)
+
+        let totalWidth: CGFloat = 1000.0
+
+        // xPosition
+        let startX = scale.xPosition(for: start, totalWidth: totalWidth)
+        let endX = scale.xPosition(for: end, totalWidth: totalWidth)
+        XCTAssertEqual(startX, 0.0, accuracy: 0.001)
+        XCTAssertEqual(endX, 1000.0, accuracy: 0.001)
+
+        let midDate = makeDate(year: 2026, month: 11, day: 6)
+        let midX = scale.xPosition(for: midDate, totalWidth: totalWidth)
+        XCTAssertEqual(midX, 500.0, accuracy: 1.0)
+
+        // date(forX:)
+        let dateAtMid = scale.date(forX: 500.0, totalWidth: totalWidth)
+        let snappedMid = scale.snapToDay(dateAtMid, calendar: calendar)
+        XCTAssertEqual(snappedMid, midDate)
+    }
+
+    func testTimelineContentWidthIncludesTrailingPadding() {
+        let calendar = fixedCalendar
+        let start = makeDate(year: 2026, month: 9, day: 17)
+        let end = makeDate(year: 2026, month: 10, day: 24) // 37 días
+        let scale = GanttTimeScale(dates: [start, end], calendar: calendar)
+
+        XCTAssertEqual(scale.totalDays, 37)
+        let baseContentWidth = CGFloat(scale.totalDays * 32)
+        let trailingPadding: CGFloat = 80
+        let totalContentWidth = max(700, baseContentWidth) + trailingPadding
+
+        XCTAssertEqual(totalContentWidth, 1184 + 80)
+        XCTAssertGreaterThan(totalContentWidth, baseContentWidth)
+    }
 }

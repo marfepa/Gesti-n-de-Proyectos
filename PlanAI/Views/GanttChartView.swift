@@ -1,36 +1,124 @@
 import SwiftUI
-import Charts
+import AppKit
 
 public struct GanttChartView: View {
     public let tasks: [ProjectTask]
     @Binding public var selectedTask: ProjectTask?
     public let onEditTask: (ProjectTask) -> Void
+    public var onTaskDateChanged: ((ProjectTask, Date, Date) -> Void)?
+
+    @State private var showSubtasksInGantt: Bool = true
+    @State private var draggingTask: ProjectTask?
+    @State private var dragMode: DragMode = .none
+    @State private var dragCurrentX: CGFloat = 0
+    @State private var dragStartX: CGFloat = 0
+    @State private var dragPreviewStart: Date?
+    @State private var dragPreviewEnd: Date?
+
+    private enum DragMode {
+        case none
+        case resizeStart
+        case resizeEnd
+        case move
+    }
+
+    private let rowHeight: CGFloat = 38.0
+    private let handleWidth: CGFloat = 10.0
+    private let leftColumnWidth: CGFloat = 200.0
 
     public init(
         tasks: [ProjectTask],
         selectedTask: Binding<ProjectTask?>,
-        onEditTask: @escaping (ProjectTask) -> Void
+        onEditTask: @escaping (ProjectTask) -> Void,
+        onTaskDateChanged: ((ProjectTask, Date, Date) -> Void)? = nil
     ) {
         self.tasks = tasks
         self._selectedTask = selectedTask
         self.onEditTask = onEditTask
+        self.onTaskDateChanged = onTaskDateChanged
+    }
+
+    /// Estructura aplanada para listar y graficar tareas y subtareas en filas
+    private struct GanttChartItem: Identifiable {
+        let id: String
+        let title: String
+        let parentTitle: String?
+        let startDate: Date
+        let endDate: Date
+        let isCompleted: Bool
+        let isSubtask: Bool
+        let taskRef: ProjectTask
+    }
+
+    private var chartItems: [GanttChartItem] {
+        var items: [GanttChartItem] = []
+
+        for task in tasks {
+            items.append(
+                GanttChartItem(
+                    id: task.id.uuidString,
+                    title: task.title,
+                    parentTitle: nil,
+                    startDate: (draggingTask?.id == task.id && dragPreviewStart != nil) ? dragPreviewStart! : task.startDate,
+                    endDate: (draggingTask?.id == task.id && dragPreviewEnd != nil) ? dragPreviewEnd! : task.endDate,
+                    isCompleted: task.isCompleted,
+                    isSubtask: false,
+                    taskRef: task
+                )
+            )
+
+            if showSubtasksInGantt && !task.subtasks.isEmpty {
+                let subtasks = task.sortedSubtasks
+                let totalSubtasks = max(1, subtasks.count)
+                let effectiveStart = (draggingTask?.id == task.id && dragPreviewStart != nil) ? dragPreviewStart! : task.startDate
+                let effectiveEnd = (draggingTask?.id == task.id && dragPreviewEnd != nil) ? dragPreviewEnd! : task.endDate
+                let taskSpan = max(1.0, effectiveEnd.timeIntervalSince(effectiveStart))
+                let slice = taskSpan / Double(totalSubtasks)
+
+                for (idx, subtask) in subtasks.enumerated() {
+                    let subStart = effectiveStart.addingTimeInterval(Double(idx) * slice)
+                    let subEnd = effectiveStart.addingTimeInterval(Double(idx + 1) * slice)
+
+                    items.append(
+                        GanttChartItem(
+                            id: subtask.id.uuidString,
+                            title: "  ↳ \(subtask.title)",
+                            parentTitle: task.title,
+                            startDate: subStart,
+                            endDate: subEnd,
+                            isCompleted: subtask.isCompleted,
+                            isSubtask: true,
+                            taskRef: task
+                        )
+                    )
+                }
+            }
+        }
+        return items
+    }
+
+    private var timeScale: GanttTimeScale {
+        GanttTimeScale(tasks: tasks)
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Cabecera y leyenda
             HStack {
-                Text(String(localized: "Cronograma de Fases (Gantt)"))
+                Text(String(localized: "Cronograma de Fases (Gantt Interactivo)"))
                     .font(.headline)
 
                 Spacer()
 
                 HStack(spacing: 16) {
+                    Toggle(String(localized: "Ver subtareas"), isOn: $showSubtasksInGantt)
+                        .font(.caption)
+
                     HStack(spacing: 6) {
                         Circle()
                             .fill(Color.blue)
                             .frame(width: 8, height: 8)
-                        Text(String(localized: "En progreso / Pendiente"))
+                        Text(String(localized: "En progreso"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -40,6 +128,15 @@ public struct GanttChartView: View {
                             .fill(Color.green)
                             .frame(width: 8, height: 8)
                         Text(String(localized: "Completada"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.purple)
+                            .frame(width: 8, height: 8)
+                        Text(String(localized: "Subtarea"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -56,63 +153,117 @@ public struct GanttChartView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 let scale = timeScale
-                ScrollView([.horizontal, .vertical]) {
-                    Chart {
-                        // Línea indicadora del día de hoy solo si cae dentro del cronograma
-                        if scale.isTodayVisible {
-                            RuleMark(
-                                x: .value(String(localized: "Hoy"), scale.today)
-                            )
-                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
-                            .foregroundStyle(Color.red.opacity(0.7))
-                            .annotation(position: .top, alignment: .leading) {
-                                Text(String(localized: "Hoy"))
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.red)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 2)
-                                    .background(Color.red.opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                            }
-                        }
+                let items = chartItems
+                let timelineTrailingPadding: CGFloat = 80
+                let contentWidth = max(700, CGFloat(scale.totalDays * 32)) + timelineTrailingPadding
 
-                        // Barras horizontales por tarea
-                        ForEach(tasks) { task in
-                            BarMark(
-                                xStart: .value(String(localized: "Inicio"), task.startDate),
-                                xEnd: .value(String(localized: "Fin"), task.endDate),
-                                y: .value(String(localized: "Tarea"), task.title)
-                            )
-                            .foregroundStyle(task.isCompleted ? Color.green.gradient : Color.blue.gradient)
-                            .cornerRadius(6)
-                            .annotation(position: .trailing, alignment: .center) {
-                                Text("\(task.durationInDays)d")
-                                    .font(.caption2)
+                ScrollView(.vertical) {
+                    HStack(alignment: .top, spacing: 0) {
+                        // Columna izquierda fija (Títulos y duraciones)
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Cabecera columna fija
+                            HStack {
+                                Text(String(localized: "Fases / Tareas"))
+                                    .font(.caption)
+                                    .fontWeight(.bold)
                                     .foregroundStyle(.secondary)
-                                    .padding(.leading, 4)
+                            }
+                            .frame(width: leftColumnWidth, height: 32, alignment: .leading)
+                            .padding(.leading, 12)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .overlay(Divider(), alignment: .bottom)
+
+                            // Filas columna fija
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                HStack {
+                                    Text(item.title)
+                                        .font(.system(size: item.isSubtask ? 11 : 12, weight: item.isSubtask ? .regular : .semibold))
+                                        .foregroundStyle(item.isSubtask ? .secondary : .primary)
+                                        .lineLimit(1)
+
+                                    Spacer()
+
+                                    if !item.isSubtask {
+                                        Text("\(item.taskRef.durationInDays)d")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .padding(.trailing, 8)
+                                    }
+                                }
+                                .frame(width: leftColumnWidth, height: rowHeight, alignment: .leading)
+                                .padding(.leading, 12)
+                                .background(index % 2 == 0 ? Color.clear : Color(nsColor: .separatorColor).opacity(0.04))
+                                .overlay(Divider().opacity(0.4), alignment: .bottom)
+                            }
+                        }
+                        .overlay(
+                            Rectangle()
+                                .frame(width: 1)
+                                .foregroundStyle(Color.gray.opacity(0.15)),
+                            alignment: .trailing
+                        )
+
+                        // Área de cronograma desplazable horizontalmente
+                        ScrollView(.horizontal) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                // Regla temporal superior (Ticks semanales / fechas)
+                                ZStack(alignment: .topLeading) {
+                                    // Ancla el ZStack al ancho completo del timeline
+                                    Color.clear
+                                        .frame(width: contentWidth, height: 32)
+
+                                    ForEach(scale.ticks, id: \.self) { tick in
+                                        let x = scale.xPosition(for: tick, totalWidth: contentWidth)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(formatDate(tick))
+                                                .font(.system(size: 9, weight: .semibold))
+                                                .foregroundStyle(.secondary)
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.3))
+                                                .frame(width: 1, height: 8)
+                                        }
+                                        .offset(x: x)
+                                    }
+                                }
+                                .frame(width: contentWidth, height: 32)
+                                .background(Color(nsColor: .controlBackgroundColor))
+                                .overlay(Divider(), alignment: .bottom)
+
+                                // Filas de barras de tareas
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    ZStack(alignment: .leading) {
+                                        // Ancla el ZStack al ancho completo — sin esto offset(x:) no funciona desde el borde izquierdo real
+                                        Color.clear
+                                            .frame(width: contentWidth, height: rowHeight)
+
+                                        // Líneas verticales de rejilla
+                                        ForEach(scale.ticks, id: \.self) { tick in
+                                            let x = scale.xPosition(for: tick, totalWidth: contentWidth)
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.12))
+                                                .frame(width: 1, height: rowHeight)
+                                                .offset(x: x)
+                                        }
+
+                                        // Línea indicadora de Hoy
+                                        if scale.isTodayVisible {
+                                            let todayX = scale.xPosition(for: scale.today, totalWidth: contentWidth)
+                                            Rectangle()
+                                                .fill(Color.red.opacity(0.6))
+                                                .frame(width: 1.5, height: rowHeight)
+                                                .offset(x: todayX)
+                                        }
+
+                                        // Barra interactiva de la tarea o subtarea
+                                        renderBar(for: item, totalWidth: contentWidth, scale: scale)
+                                    }
+                                    .frame(width: contentWidth, height: rowHeight)
+                                    .background(index % 2 == 0 ? Color.clear : Color(nsColor: .separatorColor).opacity(0.04))
+                                    .overlay(Divider().opacity(0.4), alignment: .bottom)
+                                }
                             }
                         }
                     }
-                    .chartXScale(domain: scale.domain)
-                    .chartXAxis {
-                        AxisMarks(values: scale.ticks) { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            AxisTick()
-                            AxisValueLabel(format: .dateTime.day().month(.abbreviated))
-                        }
-                    }
-                    .chartYAxis {
-                        AxisMarks { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                            AxisValueLabel()
-                        }
-                    }
-                    .frame(
-                        minWidth: max(600, CGFloat(scale.totalDays * 25)),
-                        minHeight: max(300, CGFloat(tasks.count * 45 + 80))
-                    )
-                    .padding()
                 }
             }
         }
@@ -124,7 +275,167 @@ public struct GanttChartView: View {
         )
     }
 
-    private var timeScale: GanttTimeScale {
-        GanttTimeScale(tasks: tasks)
+    @ViewBuilder
+    private func renderBar(for item: GanttChartItem, totalWidth: CGFloat, scale: GanttTimeScale) -> some View {
+        let startX = scale.xPosition(for: item.startDate, totalWidth: totalWidth)
+        let endX = scale.xPosition(for: item.endDate, totalWidth: totalWidth)
+        let barWidth = max(12.0, endX - startX)
+        let isCurrentDragging = draggingTask?.id == item.taskRef.id
+
+        ZStack(alignment: .leading) {
+            // Cuerpo de la barra
+            RoundedRectangle(cornerRadius: item.isSubtask ? 3 : 6)
+                .fill(barColor(for: item))
+                .overlay(
+                    RoundedRectangle(cornerRadius: item.isSubtask ? 3 : 6)
+                        .stroke(isCurrentDragging ? Color.white : Color.clear, lineWidth: 1.5)
+                )
+                .shadow(color: Color.black.opacity(isCurrentDragging ? 0.2 : 0.05), radius: 2, y: 1)
+
+            // Contenido interior de la barra
+            HStack {
+                Text(item.title)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 6)
+
+                Spacer(minLength: 0)
+            }
+
+            // Handles de redimensionamiento (solo para tareas principales)
+            if !item.isSubtask {
+                // Handle Izquierdo (ajustar fecha inicio)
+                Rectangle()
+                    .fill(Color.white.opacity(0.001))
+                    .frame(width: handleWidth)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                startDragging(task: item.taskRef, mode: .resizeStart, scale: scale, totalWidth: totalWidth, translation: value.translation.width)
+                            }
+                            .onEnded { _ in
+                                endDragging(scale: scale, totalWidth: totalWidth)
+                            }
+                    )
+                    .onHover { isHovering in
+                        if isHovering { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+
+                // Handle Derecho (ajustar fecha fin)
+                Rectangle()
+                    .fill(Color.white.opacity(0.001))
+                    .frame(width: handleWidth)
+                    .offset(x: barWidth - handleWidth)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                startDragging(task: item.taskRef, mode: .resizeEnd, scale: scale, totalWidth: totalWidth, translation: value.translation.width)
+                            }
+                            .onEnded { _ in
+                                endDragging(scale: scale, totalWidth: totalWidth)
+                            }
+                    )
+                    .onHover { isHovering in
+                        if isHovering { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+            }
+        }
+        .frame(width: barWidth, height: item.isSubtask ? 16 : 24)
+        .offset(x: startX)
+        .gesture(
+            // Drag en el cuerpo para mover la tarea completa
+            item.isSubtask ? nil : DragGesture()
+                .onChanged { value in
+                    startDragging(task: item.taskRef, mode: .move, scale: scale, totalWidth: totalWidth, translation: value.translation.width)
+                }
+                .onEnded { _ in
+                    endDragging(scale: scale, totalWidth: totalWidth)
+                }
+        )
+        .onTapGesture {
+            selectedTask = item.taskRef
+            if !item.isSubtask {
+                onEditTask(item.taskRef)
+            }
+        }
+    }
+
+    private func startDragging(task: ProjectTask, mode: DragMode, scale: GanttTimeScale, totalWidth: CGFloat, translation: CGFloat) {
+        self.draggingTask = task
+        self.dragMode = mode
+
+        let startX = scale.xPosition(for: task.startDate, totalWidth: totalWidth)
+        let endX = scale.xPosition(for: task.endDate, totalWidth: totalWidth)
+
+        switch mode {
+        case .resizeStart:
+            let newX = max(0, startX + translation)
+            let rawDate = scale.date(forX: newX, totalWidth: totalWidth)
+            let snapped = scale.snapToDay(rawDate)
+            let minEnd = Calendar.current.date(byAdding: .day, value: 1, to: snapped) ?? snapped
+            if snapped < task.endDate {
+                self.dragPreviewStart = snapped
+                self.dragPreviewEnd = max(minEnd, task.endDate)
+            }
+
+        case .resizeEnd:
+            let newX = min(totalWidth, endX + translation)
+            let rawDate = scale.date(forX: newX, totalWidth: totalWidth)
+            let snapped = scale.snapToDay(rawDate)
+            if snapped > task.startDate {
+                self.dragPreviewStart = task.startDate
+                self.dragPreviewEnd = snapped
+            }
+
+        case .move:
+            let durationSeconds = task.endDate.timeIntervalSince(task.startDate)
+            let newStartX = max(0, startX + translation)
+            let rawStartDate = scale.date(forX: newStartX, totalWidth: totalWidth)
+            let snappedStart = scale.snapToDay(rawStartDate)
+            let snappedEnd = snappedStart.addingTimeInterval(durationSeconds)
+            self.dragPreviewStart = snappedStart
+            self.dragPreviewEnd = snappedEnd
+
+        case .none:
+            break
+        }
+    }
+
+    private func endDragging(scale: GanttTimeScale, totalWidth: CGFloat) {
+        guard let task = draggingTask,
+              let finalStart = dragPreviewStart,
+              let finalEnd = dragPreviewEnd else {
+            resetDragState()
+            return
+        }
+
+        onTaskDateChanged?(task, finalStart, finalEnd)
+        resetDragState()
+    }
+
+    private func resetDragState() {
+        self.draggingTask = nil
+        self.dragMode = .none
+        self.dragPreviewStart = nil
+        self.dragPreviewEnd = nil
+    }
+
+    private func barColor(for item: GanttChartItem) -> LinearGradient {
+        if item.isCompleted {
+            return LinearGradient(colors: [Color.green.opacity(0.9), Color.green], startPoint: .leading, endPoint: .trailing)
+        } else if item.isSubtask {
+            return LinearGradient(colors: [Color.purple.opacity(0.8), Color.purple], startPoint: .leading, endPoint: .trailing)
+        } else {
+            return LinearGradient(colors: [Color.blue.opacity(0.85), Color.blue], startPoint: .leading, endPoint: .trailing)
+        }
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
 }
