@@ -14,7 +14,7 @@ public struct ProjectInputView: View {
     @State private var targetEndDate: Date = Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
     @State private var priority: ProjectPriority = .media
 
-    // Servicio nativo de audio y transcripción offline
+    // Servicio nativo de grabación y transcripción (AVAudioRecorder + SFSpeech)
     @State private var transcriptionService = AudioTranscriptionService()
     @State private var baseDescriptionBeforeRecording: String = ""
 
@@ -103,7 +103,7 @@ public struct ProjectInputView: View {
                                 .foregroundStyle(projectDescription.count > 1500 ? .orange : .secondary)
                         }
 
-                        // Barra de herramientas de captura de audio offline
+                        // Barra de herramientas de grabación — flujo: Grabar → Detener y Transcribir (automático)
                         VStack(spacing: 8) {
                             HStack(spacing: 12) {
                                 // Selector de idioma
@@ -125,8 +125,8 @@ public struct ProjectInputView: View {
                                 Spacer()
 
                                 if transcriptionService.isRecording {
-                                    // Estado grabando: botón de parar
-                                    Button(action: stopRecording) {
+                                    // Grabando → botón para detener Y transcribir automáticamente
+                                    Button(action: stopAndTranscribe) {
                                         HStack(spacing: 6) {
                                             Image(systemName: "stop.circle.fill")
                                                 .foregroundStyle(.red)
@@ -137,7 +137,7 @@ public struct ProjectInputView: View {
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(.red)
 
-                                            Text(String(localized: "Detener Grabación"))
+                                            Text(String(localized: "Detener y Transcribir"))
                                                 .font(.caption)
                                         }
                                         .padding(.horizontal, 8)
@@ -145,37 +145,14 @@ public struct ProjectInputView: View {
                                     }
                                     .buttonStyle(.bordered)
                                     .tint(.red)
-                                } else if transcriptionService.recordedFileURL != nil && !transcriptionService.isTranscribing {
-                                    // Audio grabado listo para transcribir o descartar
-                                    HStack(spacing: 8) {
-                                        Button(action: startTranscribing) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "waveform.badge.magnifyingglass")
-                                                    .foregroundStyle(.blue)
-                                                Text(String(localized: "Transcribir Audio"))
-                                                    .font(.caption)
-                                                    .fontWeight(.semibold)
-                                            }
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                        }
-                                        .buttonStyle(.borderedProminent)
 
-                                        Button(action: discardRecordedAudio) {
-                                            Image(systemName: "trash")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .help(String(localized: "Descartar audio grabado"))
-                                    }
                                 } else if !transcriptionService.isTranscribing {
-                                    // Estado idle: botón de empezar a grabar
+                                    // Idle → botón para iniciar grabación
                                     Button(action: startRecording) {
                                         HStack(spacing: 6) {
                                             Image(systemName: "mic.fill")
                                                 .foregroundStyle(.blue)
-                                            Text(String(localized: "Grabar Audio"))
+                                            Text(String(localized: "Grabar Descripción"))
                                                 .font(.caption)
                                         }
                                         .padding(.horizontal, 8)
@@ -185,7 +162,7 @@ public struct ProjectInputView: View {
                                 }
                             }
 
-                            // Barra de progreso y estado durante la transcripción offline
+                            // Progreso de transcripción
                             if transcriptionService.isTranscribing {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 8) {
@@ -221,15 +198,15 @@ public struct ProjectInputView: View {
                         .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                        // Banner de estado de grabación
+                        // Indicador REC animado
                         if transcriptionService.isRecording {
                             HStack(spacing: 8) {
                                 Circle()
                                     .fill(Color.red)
                                     .frame(width: 8, height: 8)
-                                    .opacity(0.8)
+                                    .opacity(0.85)
 
-                                Text(String(localized: "Grabando archivo de audio para transcripción offline..."))
+                                Text(String(localized: "Grabando… pulsa «Detener y Transcribir» cuando termines."))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
 
@@ -239,7 +216,7 @@ public struct ProjectInputView: View {
                             .transition(.opacity)
                         }
 
-                        // Error de transcripción o micrófono
+                        // Mensaje de error
                         if let error = transcriptionService.errorMessage {
                             Text(error)
                                 .font(.caption2)
@@ -269,7 +246,7 @@ public struct ProjectInputView: View {
                     VStack(spacing: 10) {
                         Button(action: {
                             if transcriptionService.isRecording {
-                                transcriptionService.stopRecording()
+                                transcriptionService.cancel()
                             }
 
                             let effectiveTarget = hasTargetEndDate ? targetEndDate : nil
@@ -304,7 +281,7 @@ public struct ProjectInputView: View {
 
                         Button(action: {
                             if transcriptionService.isRecording {
-                                transcriptionService.stopRecording()
+                                transcriptionService.cancel()
                             }
 
                             let effectiveTarget = hasTargetEndDate ? targetEndDate : nil
@@ -330,9 +307,6 @@ public struct ProjectInputView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "Cancelar")) {
-                        if transcriptionService.isRecording {
-                            transcriptionService.stopRecording()
-                        }
                         transcriptionService.cancel()
                         dismiss()
                     }
@@ -352,13 +326,31 @@ public struct ProjectInputView: View {
                 Text(viewModel.errorMessage ?? String(localized: "Ocurrió un error inesperado."))
             }
             .onDisappear {
-                if transcriptionService.isRecording {
-                    transcriptionService.stopRecording()
+                transcriptionService.cancel()
+            }
+            .onChange(of: transcriptionService.phase) { _, newPhase in
+                // Cuando la transcripción completa, insertar el texto en la descripción
+                if case .completed = newPhase {
+                    let clean = transcriptionService.transcribedText
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !clean.isEmpty else {
+                        transcriptionService.resetAfterCompletion()
+                        return
+                    }
+
+                    if baseDescriptionBeforeRecording.isEmpty {
+                        projectDescription = clean
+                    } else {
+                        projectDescription = baseDescriptionBeforeRecording + "\n\n" + clean
+                    }
+                    // Resetear para permitir nueva grabación
+                    transcriptionService.resetAfterCompletion()
                 }
-                transcriptionService.cleanupTempFile()
             }
         }
     }
+
+    // MARK: - Acciones de grabación
 
     private func startRecording() {
         baseDescriptionBeforeRecording = projectDescription.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -367,29 +359,7 @@ public struct ProjectInputView: View {
         }
     }
 
-    private func stopRecording() {
-        transcriptionService.stopRecording()
-    }
-
-    private func discardRecordedAudio() {
-        transcriptionService.cleanupTempFile()
-    }
-
-    private func startTranscribing() {
-        Task {
-            do {
-                let text = try await transcriptionService.transcribeRecordedAudio()
-                let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !clean.isEmpty else { return }
-
-                if baseDescriptionBeforeRecording.isEmpty {
-                    self.projectDescription = clean
-                } else {
-                    self.projectDescription = "\(baseDescriptionBeforeRecording)\n\(clean)"
-                }
-            } catch {
-                // El error ya queda expuesto en transcriptionService.errorMessage
-            }
-        }
+    private func stopAndTranscribe() {
+        transcriptionService.stopRecordingAndTranscribe()
     }
 }
