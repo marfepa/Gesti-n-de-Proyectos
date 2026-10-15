@@ -69,7 +69,7 @@ public struct TaskListView: View {
                             }) {
                                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                                     .font(.title3)
-                                    .foregroundStyle(task.isCompleted ? .green : .secondary)
+                                    .foregroundStyle(task.isCompleted ? StructuredTheme.mint : Color.gray.opacity(0.4))
                             }
                             .buttonStyle(.plain)
                             .padding(.top, 2)
@@ -77,34 +77,32 @@ public struct TaskListView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Text(task.title)
-                                        .font(.body)
-                                        .fontWeight(.medium)
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
                                         .strikethrough(task.isCompleted, color: .secondary)
                                         .foregroundStyle(task.isCompleted ? .secondary : .primary)
 
                                     if task.isLargeTask {
                                         Text("Fase Extensa")
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.system(size: 9, weight: .bold, design: .rounded))
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 2)
-                                            .background(Color.purple.opacity(0.12))
-                                            .foregroundStyle(.purple)
+                                            .background(StructuredTheme.lavender.opacity(0.14))
+                                            .foregroundStyle(StructuredTheme.lavender)
                                             .clipShape(Capsule())
                                     }
 
                                     Spacer()
 
                                     Text(task.dateRangeFormatted)
-                                        .font(.caption)
+                                        .font(.system(size: 11, design: .rounded))
                                         .foregroundStyle(.secondary)
 
                                     Text(String(format: "%.1fh", task.effectiveEstimatedHours))
-                                        .font(.caption2)
-                                        .fontWeight(.semibold)
+                                        .font(.system(size: 10, weight: .bold, design: .rounded))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background(Color.blue.opacity(0.12))
-                                        .foregroundStyle(.blue)
+                                        .background(StructuredTheme.ocean.opacity(0.12))
+                                        .foregroundStyle(StructuredTheme.ocean)
                                         .clipShape(Capsule())
                                 }
 

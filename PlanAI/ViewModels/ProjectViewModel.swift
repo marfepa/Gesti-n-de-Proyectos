@@ -10,11 +10,13 @@ public final class ProjectViewModel {
     public var showErrorAlert: Bool = false
     
     public enum SidebarTab: Hashable {
+        case todayTimeline
+        case inbox
         case projects
         case weeklySchedule
     }
 
-    public var activeTab: SidebarTab = .projects
+    public var activeTab: SidebarTab = .todayTimeline
     public var selectedProject: Project?
     public var showingNewProjectSheet: Bool = false
     public var showingTaskSheet: Bool = false

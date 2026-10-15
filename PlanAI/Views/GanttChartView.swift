@@ -425,11 +425,11 @@ public struct GanttChartView: View {
 
     private func barColor(for item: GanttChartItem) -> LinearGradient {
         if item.isCompleted {
-            return LinearGradient(colors: [Color.green.opacity(0.9), Color.green], startPoint: .leading, endPoint: .trailing)
+            return LinearGradient(colors: [StructuredTheme.mint.opacity(0.85), StructuredTheme.mint], startPoint: .leading, endPoint: .trailing)
         } else if item.isSubtask {
-            return LinearGradient(colors: [Color.purple.opacity(0.8), Color.purple], startPoint: .leading, endPoint: .trailing)
+            return LinearGradient(colors: [StructuredTheme.lavender.opacity(0.85), StructuredTheme.lavender], startPoint: .leading, endPoint: .trailing)
         } else {
-            return LinearGradient(colors: [Color.blue.opacity(0.85), Color.blue], startPoint: .leading, endPoint: .trailing)
+            return LinearGradient(colors: [StructuredTheme.ocean.opacity(0.85), StructuredTheme.ocean], startPoint: .leading, endPoint: .trailing)
         }
     }
 
