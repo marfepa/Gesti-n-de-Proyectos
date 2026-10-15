@@ -14,6 +14,13 @@ public final class ProjectTask: Identifiable {
     public var sortOrder: Int = 0
     public var scheduledDate: Date?
     
+    // Propiedades para soporte de UI/UX estilo Structured
+    public var isInbox: Bool = false
+    public var hasFixedTime: Bool = false
+    public var fixedStartMinute: Int?
+    public var fixedEndMinute: Int?
+    public var iconName: String = "doc.fill"
+    
     public var project: Project?
 
     @Relationship(deleteRule: .cascade, inverse: \ProjectSubtask.task)
@@ -30,6 +37,11 @@ public final class ProjectTask: Identifiable {
         isCompleted: Bool = false,
         sortOrder: Int = 0,
         scheduledDate: Date? = nil,
+        isInbox: Bool = false,
+        hasFixedTime: Bool = false,
+        fixedStartMinute: Int? = nil,
+        fixedEndMinute: Int? = nil,
+        iconName: String = "doc.fill",
         project: Project? = nil
     ) {
         self.id = id
@@ -42,6 +54,11 @@ public final class ProjectTask: Identifiable {
         self.isCompleted = isCompleted
         self.sortOrder = sortOrder
         self.scheduledDate = scheduledDate
+        self.isInbox = isInbox
+        self.hasFixedTime = hasFixedTime
+        self.fixedStartMinute = fixedStartMinute
+        self.fixedEndMinute = fixedEndMinute
+        self.iconName = iconName
         self.project = project
         self.subtasks = []
     }
@@ -86,3 +103,4 @@ public final class ProjectTask: Identifiable {
         return subtasks.reduce(0.0) { $0 + $1.estimatedHours }
     }
 }
+
