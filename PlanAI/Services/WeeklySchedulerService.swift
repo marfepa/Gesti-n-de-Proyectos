@@ -15,6 +15,7 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public var endMinute: Int
     public var allocatedHours: Double
     public var isCompleted: Bool
+    public var iconName: String
 
     public init(
         id: UUID = UUID(),
@@ -29,7 +30,8 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         startMinute: Int,
         endMinute: Int,
         allocatedHours: Double,
-        isCompleted: Bool
+        isCompleted: Bool,
+        iconName: String = "doc.fill"
     ) {
         self.id = id
         self.taskId = taskId
@@ -44,11 +46,12 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         self.endMinute = endMinute
         self.allocatedHours = allocatedHours
         self.isCompleted = isCompleted
+        self.iconName = iconName
     }
 
     public var displayTitle: String {
         if let sub = subtaskTitle, !sub.isEmpty {
-            return "\(taskTitle) › \(sub)"
+            return "\(taskTitle) · \(sub)"
         }
         return taskTitle
     }
@@ -103,25 +106,17 @@ public struct ScheduleResult: Sendable, Equatable {
         max(0, totalDemandHours - totalAllocatedHours)
     }
 
-    /// Porcentaje de aprovechamiento de los momentos disponibles (0.0 a 1.0).
     public var slotUtilization: Double {
         guard totalAvailableHours > 0 else { return 0.0 }
         return min(1.0, totalAllocatedHours / totalAvailableHours)
     }
 }
 
-/// Motor determinista de asignación de tareas a bloques semanales.
+/// Motor determinista de asignación de tareas a bloques semanales + soporte de eventos con hora fija.
 public final class WeeklySchedulerService: Sendable {
+
     public init() {}
 
-    /// Calcula la planificación segura para una ventana de semanas dada (por defecto 2 semanas a partir de startDate).
-    /// - Parameters:
-    ///   - projects: Proyectos activos con sus tareas.
-    ///   - slots: Franjas semanales configuradas por el usuario.
-    ///   - startDate: Fecha inicial (por defecto hoy a las 00:00).
-    ///   - weeksToSchedule: Número de semanas hacia adelante a considerar (por defecto 2).
-    ///   - safetyBufferPercent: Colchón de seguridad temporal reservado en cada hueco (ej. 0.15 = 15%).
-    ///   - calendar: Calendario a utilizar.
     public func schedule(
         projects: [Project],
         slots: [WorkSlot],
@@ -131,8 +126,7 @@ public final class WeeklySchedulerService: Sendable {
         calendar: Calendar = .current
     ) -> ScheduleResult {
         let enabledSlots = slots.filter { $0.isEnabled && $0.durationMinutes > 0 }
-        
-        // 1. Recopilar unidades de trabajo pendientes de proyectos activos ordenadas según criterio seguro (Prioridad + EDF + Fase + Subtarea)
+
         struct TaskCandidate {
             let task: ProjectTask
             let subtask: ProjectSubtask?
@@ -146,17 +140,49 @@ public final class WeeklySchedulerService: Sendable {
         }
 
         var candidates: [TaskCandidate] = []
+        var fixedScheduledItems: [ScheduledItem] = []
         var totalDemand: Double = 0.0
+        var totalAllocatedHours: Double = 0.0
 
         for project in projects {
-            // Filtrar solo tareas no completadas
-            let pendingTasks = project.sortedTasks.filter { !$0.isCompleted }
+            let activeTasks = project.sortedTasks.filter { !$0.isInbox }
             let deadline = project.effectiveDeadline
             let priority = project.priority
 
-            for task in pendingTasks {
-                // Si la tarea tiene subtareas, despachar a nivel de subtareas pendientes
+            for task in activeTasks {
+                // 1. Tareas con hora fija agendadas directamente en el Timeline (estilo Structured)
+                if task.hasFixedTime, let fStart = task.fixedStartMinute, let fEnd = task.fixedEndMinute {
+                    let durationMin = max(1, fEnd - fStart)
+                    let hours = Double(durationMin) / 60.0
+                    let targetDate = calendar.startOfDay(for: task.scheduledDate ?? task.startDate)
+                    fixedScheduledItems.append(
+                        ScheduledItem(
+                            taskId: task.id,
+                            projectId: project.id,
+                            subtaskId: nil,
+                            taskTitle: task.title,
+                            subtaskTitle: task.subtasks.isEmpty ? nil : "\(task.subtasks.filter(\.isCompleted).count)/\(task.subtasks.count) subtasks",
+                            projectName: project.name,
+                            projectPriority: priority,
+                            date: targetDate,
+                            startMinute: fStart,
+                            endMinute: fEnd,
+                            allocatedHours: hours,
+                            isCompleted: task.isCompleted,
+                            iconName: task.iconName
+                        )
+                    )
+                    if !task.isCompleted {
+                        totalDemand += hours
+                        totalAllocatedHours += hours
+                    }
+                    continue
+                }
+
+                // 2. Tareas automáticas de proyecto (solo pendientes)
+                guard !task.isCompleted else { continue }
                 let pendingSubtasks = task.sortedSubtasks.filter { !$0.isCompleted }
+
                 if !pendingSubtasks.isEmpty {
                     for sub in pendingSubtasks {
                         let hours = max(0.25, sub.estimatedHours)
@@ -176,7 +202,6 @@ public final class WeeklySchedulerService: Sendable {
                         )
                     }
                 } else {
-                    // Si no tiene subtareas (o todas completadas pero la tarea no), despachar la tarea completa
                     let hours = max(0.5, task.effectiveEstimatedHours)
                     totalDemand += hours
                     candidates.append(
@@ -196,12 +221,6 @@ public final class WeeklySchedulerService: Sendable {
             }
         }
 
-        // Orden de prioridad para máxima optimización multiproyecto:
-        // 1. Prioridad del proyecto (urgente > alta > media > baja)
-        // 2. Earliest Deadline First (EDF) del proyecto
-        // 3. Nombre del proyecto (determinismo)
-        // 4. Orden de fase/tarea dentro del proyecto
-        // 5. Orden de subtarea
         candidates.sort { a, b in
             if a.projectPriority != b.projectPriority {
                 return a.projectPriority.rawValue > b.projectPriority.rawValue
@@ -220,11 +239,11 @@ public final class WeeklySchedulerService: Sendable {
 
         guard !enabledSlots.isEmpty else {
             return ScheduleResult(
-                scheduledItems: [],
+                scheduledItems: fixedScheduledItems,
                 unscheduledTasks: candidates.map {
                     UnscheduledTaskInfo(
                         id: $0.subtask?.id ?? $0.task.id,
-                        taskTitle: $0.subtask != nil ? "\($0.task.title) › \($0.subtask!.title)" : $0.task.title,
+                        taskTitle: $0.subtask != nil ? "\($0.task.title) · \($0.subtask!.title)" : $0.task.title,
                         projectName: $0.projectName,
                         projectPriority: $0.projectPriority,
                         remainingHours: $0.remainingHours,
@@ -233,12 +252,11 @@ public final class WeeklySchedulerService: Sendable {
                 },
                 totalAvailableHours: 0,
                 totalDemandHours: totalDemand,
-                totalAllocatedHours: 0,
+                totalAllocatedHours: totalAllocatedHours,
                 bufferPercentApplied: safetyBufferPercent
             )
         }
 
-        // 2. Generar ocurrencias concretas de bloques en el rango [startDate, startDate + (weeks * 7 días)]
         let normalizedStart = calendar.startOfDay(for: startDate)
         let totalDays = max(7, weeksToSchedule * 7)
 
@@ -268,11 +286,12 @@ public final class WeeklySchedulerService: Sendable {
                 let netMinutes = max(15, grossMinutes - bufferMinutes)
 
                 totalAvailableHours += Double(netMinutes) / 60.0
+
                 concreteSlots.append(
                     ConcreteSlot(
                         date: slotDate,
                         startMinute: s.startMinute,
-                        endMinute: s.startMinute + netMinutes, // El fin usable respeta el buffer
+                        endMinute: s.startMinute + netMinutes,
                         usableMinutes: netMinutes,
                         remainingMinutes: netMinutes,
                         currentCursorMinute: s.startMinute
@@ -281,18 +300,12 @@ public final class WeeklySchedulerService: Sendable {
             }
         }
 
-        // 3. Asignación determinista con Principio Estoico Monotarea (Una sola tarea por franja horaria)
-        // Regla: En cada franja horaria solo se asigna una única tarea.
-        // Si la tarea finaliza antes del fin de la franja, no se introduce ninguna otra tarea en esa misma franja.
-        // Si la tarea requiere más tiempo del disponible en la franja, consume la franja y continúa en la siguiente franja.
-        var scheduledItems: [ScheduledItem] = []
-        var totalAllocatedHours: Double = 0.0
+        var scheduledItems: [ScheduledItem] = fixedScheduledItems
         var slotIndex = 0
 
         for candidateIndex in 0..<candidates.count {
             while candidates[candidateIndex].remainingHours > 0.01 && slotIndex < concreteSlots.count {
                 var currentSlot = concreteSlots[slotIndex]
-
                 if currentSlot.remainingMinutes <= 0 {
                     slotIndex += 1
                     continue
@@ -300,7 +313,6 @@ public final class WeeklySchedulerService: Sendable {
 
                 let taskNeededMinutes = Int(round(candidates[candidateIndex].remainingHours * 60.0))
                 let minutesToAssign = min(currentSlot.remainingMinutes, taskNeededMinutes)
-
                 let startMin = currentSlot.currentCursorMinute
                 let endMin = startMin + minutesToAssign
                 let assignedHours = Double(minutesToAssign) / 60.0
@@ -318,7 +330,8 @@ public final class WeeklySchedulerService: Sendable {
                         startMinute: startMin,
                         endMinute: endMin,
                         allocatedHours: assignedHours,
-                        isCompleted: candidates[candidateIndex].subtask?.isCompleted ?? candidates[candidateIndex].task.isCompleted
+                        isCompleted: candidates[candidateIndex].subtask?.isCompleted ?? candidates[candidateIndex].task.isCompleted,
+                        iconName: candidates[candidateIndex].task.iconName
                     )
                 )
 
@@ -328,17 +341,13 @@ public final class WeeklySchedulerService: Sendable {
                 concreteSlots[slotIndex] = currentSlot
                 totalAllocatedHours += assignedHours
 
-                // Principio Estoico: Foco exclusivo en una única tarea por franja.
-                // Ya sea que la tarea haya consumido todos los minutos de la franja o haya finalizado sus horas,
-                // la franja actual queda cerrada para cualquier otra tarea subsiguiente.
                 slotIndex += 1
             }
         }
 
-        // 4. Identificar tareas desbordadas que no pudieron completarse en el horizonte
         var unscheduled: [UnscheduledTaskInfo] = []
         for candidate in candidates where candidate.remainingHours > 0.05 {
-            let label = candidate.subtask != nil ? "\(candidate.task.title) › \(candidate.subtask!.title)" : candidate.task.title
+            let label = candidate.subtask != nil ? "\(candidate.task.title) · \(candidate.subtask!.title)" : candidate.task.title
             unscheduled.append(
                 UnscheduledTaskInfo(
                     id: candidate.subtask?.id ?? candidate.task.id,
@@ -361,3 +370,4 @@ public final class WeeklySchedulerService: Sendable {
         )
     }
 }
+
