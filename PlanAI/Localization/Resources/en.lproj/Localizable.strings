@@ -48,3 +48,18 @@
 "transcription_language" = "Dictation language:";
 "listening" = "Listening... explain your project";
 "voice_input_tooltip" = "Record audio and automatically transcribe to text";
+
+/* Structured Timeline & Inbox */
+"Rise and Shine" = "Rise and Shine";
+"Wind Down" = "Wind Down";
+"Tasks are overlapping" = "Tasks are overlapping";
+"Add Task" = "Add Task";
+"You've got the whole day ahead. Ready to schedule?" = "You've got the whole day ahead. Ready to schedule?";
+"Your Unstructured Thoughts" = "Your Unstructured Thoughts";
+"Capture tasks and thoughts as they come. Move them to your timeline when you're ready to schedule." = "Capture tasks and thoughts as they come. Move them to your timeline when you're ready to schedule.";
+"New Inbox Task" = "New Inbox Task";
+"Inbox Task" = "Inbox Task";
+"Hoy" = "Today";
+"Semana" = "Week";
+"Bandeja" = "Inbox";
+"Proyectos" = "Projects";

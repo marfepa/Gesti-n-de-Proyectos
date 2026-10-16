@@ -39,6 +39,8 @@ targets:
       - framework: Charts.framework
       - framework: AVFoundation.framework
       - framework: Speech.framework
+      - framework: EventKit.framework
+      - framework: UserNotifications.framework
       - framework: FoundationModels.framework
         optional: true
 
