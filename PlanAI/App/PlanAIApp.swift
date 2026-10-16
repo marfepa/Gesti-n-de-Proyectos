@@ -10,6 +10,7 @@ struct PlanAIApp: App {
             let schema = Schema([
                 Project.self,
                 ProjectTask.self,
+                ProjectSubtask.self,
                 WorkSlot.self
             ])
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -29,5 +30,11 @@ struct PlanAIApp: App {
         .commands {
             SidebarCommands()
         }
+
+        MenuBarExtra("PlanAI", systemImage: "calendar.day.timeline.left") {
+            MenuBarCompanionView()
+                .modelContainer(sharedModelContainer)
+        }
+        .menuBarExtraStyle(.window)
     }
 }

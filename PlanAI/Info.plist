@@ -28,5 +28,7 @@
     <string>PlanAI necesita acceso al micrófono para grabar la descripción de tu proyecto mediante voz.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>PlanAI utiliza el reconocimiento de voz de Apple para transcribir tu explicación a texto directamente en el dispositivo.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>PlanAI puede mostrar tus eventos de Apple Calendar en el Timeline y evitar programar tareas durante tus reuniones.</string>
 </dict>
 </plist>

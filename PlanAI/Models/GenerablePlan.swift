@@ -37,7 +37,7 @@ public struct AITaskPlan: Sendable {
 
 /// Representa la fase/tarea principal generada por FoundationModels.
 @available(macOS 26.0, *)
-@Generable(description: "Fase de trabajo con título, horas estimadas de trabajo efectivo, notas y desglose de subtareas específicas")
+@Generable(description: "Fase de trabajo con título, horas estimadas de trabajo efectivo, icono SF Symbol, color de categoría, notas y desglose de subtareas específicas")
 public struct AISubtaskPlan: Sendable {
     @Guide(description: "Título conciso, profesional y accionable de la fase")
     public var title: String
@@ -48,15 +48,56 @@ public struct AISubtaskPlan: Sendable {
     @Guide(description: "Breve justificación de por qué es necesaria esta fase y cuál es su entregable")
     public var notes: String
 
+    @Guide(description: "Nombre de icono SF Symbol adecuado para la tarea entre: laptopcomputer, paintbrush.fill, doc.fill, terminal.fill, server.rack, checkmark.shield.fill, chart.bar.fill, person.2.fill, sparkles, checklist")
+    public var iconName: String
+
+    @Guide(description: "Token de color para la fase entre: coral, ocean, teal, lavender, amber, mint")
+    public var colorToken: String
+
     @Guide(description: "Lista de subtareas concretas y accionables que componen esta fase")
     public var subtasks: [AISubtaskDetail]
 
-    public init(title: String, estimatedHours: Double, notes: String, subtasks: [AISubtaskDetail] = []) {
+    public init(
+        title: String,
+        estimatedHours: Double,
+        notes: String,
+        iconName: String = "doc.fill",
+        colorToken: String = "coral",
+        subtasks: [AISubtaskDetail] = []
+    ) {
         self.title = title
         self.estimatedHours = max(0.5, estimatedHours)
         self.notes = notes
+        self.iconName = iconName
+        self.colorToken = colorToken
         self.subtasks = subtasks
     }
+}
+
+/// Estructura generable para el asistente rápido "Structured AI" (lenguaje natural a tarea agendada).
+@available(macOS 26.0, *)
+@Generable(description: "Tarea extraída de una instrucción en lenguaje natural para agendar en el día")
+public struct AIQuickScheduledTask: Sendable {
+    @Guide(description: "Título claro y accionable de la tarea")
+    public var title: String
+
+    @Guide(description: "Minuto del día de inicio (ej. 9:00 AM = 540, 10:00 AM = 600, 4:00 PM = 960)", .range(360...1380))
+    public var startMinute: Int
+
+    @Guide(description: "Duración en minutos (15, 30, 45, 60, 90 o 120)", .range(15...240))
+    public var durationMinutes: Int
+
+    @Guide(description: "Icono SF Symbol entre: laptopcomputer, paintbrush.fill, doc.fill, at, person.2.fill, figure.run, book.fill, phone.fill, sparkles, checklist")
+    public var iconName: String
+
+    @Guide(description: "Token de color entre: coral, ocean, teal, lavender, amber, mint")
+    public var colorToken: String
+
+    @Guide(description: "Notas o contexto adicional")
+    public var notes: String
+
+    @Guide(description: "Lista breve de pasos o subtareas (máximo 4)")
+    public var subtasks: [String]
 }
 #endif
 
@@ -79,6 +120,8 @@ public struct SubtaskPlan: Sendable, Codable, Equatable {
     public var estimatedDays: Int
     public var estimatedHours: Double
     public var notes: String
+    public var iconName: String
+    public var colorToken: String
     public var subtaskDetails: [SubtaskDetailPlan]
 
     public init(
@@ -86,6 +129,8 @@ public struct SubtaskPlan: Sendable, Codable, Equatable {
         estimatedDays: Int? = nil,
         estimatedHours: Double? = nil,
         notes: String = "",
+        iconName: String = "doc.fill",
+        colorToken: String = "coral",
         subtaskDetails: [SubtaskDetailPlan] = []
     ) {
         self.title = title
@@ -94,6 +139,8 @@ public struct SubtaskPlan: Sendable, Codable, Equatable {
         self.estimatedDays = max(1, resolvedDays)
         self.estimatedHours = max(0.5, resolvedHours)
         self.notes = notes
+        self.iconName = iconName
+        self.colorToken = colorToken
         self.subtaskDetails = subtaskDetails
     }
 }

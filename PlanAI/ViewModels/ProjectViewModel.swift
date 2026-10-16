@@ -9,11 +9,31 @@ public final class ProjectViewModel {
     public var errorMessage: String?
     public var showErrorAlert: Bool = false
     
-    public enum SidebarTab: Hashable {
+    public enum SidebarTab: String, CaseIterable, Hashable, Identifiable {
         case todayTimeline
+        case weeklySchedule
         case inbox
         case projects
-        case weeklySchedule
+
+        public var id: String { rawValue }
+
+        public var title: String {
+            switch self {
+            case .todayTimeline: return String(localized: "Hoy")
+            case .weeklySchedule: return String(localized: "Semana")
+            case .inbox: return String(localized: "Bandeja")
+            case .projects: return String(localized: "Proyectos")
+            }
+        }
+
+        public var iconName: String {
+            switch self {
+            case .todayTimeline: return "sun.max.fill"
+            case .weeklySchedule: return "calendar"
+            case .inbox: return "tray.fill"
+            case .projects: return "chart.bar.xaxis"
+            }
+        }
     }
 
     public var activeTab: SidebarTab = .todayTimeline
@@ -36,6 +56,8 @@ public final class ProjectViewModel {
         startDate: Date,
         targetEndDate: Date? = nil,
         priority: ProjectPriority = .media,
+        colorToken: String = "coral",
+        iconName: String = "folder.fill",
         context: ModelContext
     ) async {
         isDecomposing = true
@@ -60,7 +82,9 @@ public final class ProjectViewModel {
                 projectDescription: description,
                 startDate: normalizedStart,
                 targetEndDate: normalizedTarget,
-                priority: priority
+                priority: priority,
+                colorToken: colorToken,
+                iconName: iconName
             )
             context.insert(project)
 
@@ -74,12 +98,13 @@ public final class ProjectViewModel {
                     estimatedHours: payload.estimatedHours,
                     isCompleted: false,
                     sortOrder: payload.sortOrder,
+                    iconName: payload.iconName,
+                    colorToken: payload.colorToken,
                     project: project
                 )
                 context.insert(task)
                 project.tasks.append(task)
 
-                // Insertar subtareas desglosadas
                 for (subIdx, sub) in payload.subtasks.enumerated() {
                     let subtask = ProjectSubtask(
                         title: sub.title,
@@ -111,6 +136,8 @@ public final class ProjectViewModel {
         startDate: Date,
         targetEndDate: Date? = nil,
         priority: ProjectPriority = .media,
+        colorToken: String = "coral",
+        iconName: String = "folder.fill",
         context: ModelContext
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -124,7 +151,9 @@ public final class ProjectViewModel {
             projectDescription: description,
             startDate: normalizedStart,
             targetEndDate: normalizedTarget,
-            priority: priority
+            priority: priority,
+            colorToken: colorToken,
+            iconName: iconName
         )
         context.insert(project)
         try? context.save()
@@ -140,6 +169,8 @@ public final class ProjectViewModel {
         startDate: Date,
         targetEndDate: Date?,
         priority: ProjectPriority,
+        colorToken: String? = nil,
+        iconName: String? = nil,
         context: ModelContext
     ) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -148,6 +179,12 @@ public final class ProjectViewModel {
         project.startDate = Calendar.current.startOfDay(for: startDate)
         project.targetEndDate = targetEndDate.map { Calendar.current.startOfDay(for: $0) }
         project.priority = priority
+        if let colorToken {
+            project.colorToken = colorToken
+        }
+        if let iconName {
+            project.iconName = iconName
+        }
 
         try? context.save()
         self.showingEditProjectSheet = false
@@ -161,6 +198,8 @@ public final class ProjectViewModel {
         startDate: Date,
         endDate: Date,
         estimatedHours: Double = 4.0,
+        iconName: String? = nil,
+        colorToken: String? = nil,
         in project: Project,
         context: ModelContext
     ) {
@@ -180,6 +219,8 @@ public final class ProjectViewModel {
             existing.endDate = max(normalizedStart, normalizedEnd)
             existing.estimatedDays = days
             existing.estimatedHours = estimatedHours
+            if let iconName { existing.iconName = iconName }
+            if let colorToken { existing.colorToken = colorToken }
         } else {
             let nextOrder = (project.tasks.map(\.sortOrder).max() ?? -1) + 1
             let newTask = ProjectTask(
@@ -191,6 +232,8 @@ public final class ProjectViewModel {
                 estimatedHours: estimatedHours,
                 isCompleted: false,
                 sortOrder: nextOrder,
+                iconName: iconName ?? TaskDecompositionService.inferIcon(for: title),
+                colorToken: colorToken ?? project.colorToken,
                 project: project
             )
             context.insert(newTask)
@@ -230,6 +273,12 @@ public final class ProjectViewModel {
     /// Alterna el estado de completado de una tarea.
     public func toggleTaskCompletion(_ task: ProjectTask, context: ModelContext) {
         task.isCompleted.toggle()
+        if task.isCompleted {
+            for s in task.subtasks {
+                s.isCompleted = true
+            }
+            NotificationService.shared.cancelNotification(for: task.id)
+        }
         try? context.save()
     }
 
@@ -237,7 +286,6 @@ public final class ProjectViewModel {
     public func toggleSubtaskCompletion(_ subtask: ProjectSubtask, context: ModelContext) {
         subtask.isCompleted.toggle()
         
-        // Si todas las subtareas están completadas, marcar la tarea contenedora también
         if let parent = subtask.task {
             let allCompleted = parent.subtasks.allSatisfy { $0.isCompleted }
             if allCompleted && !parent.subtasks.isEmpty {
@@ -250,27 +298,33 @@ public final class ProjectViewModel {
         try? context.save()
     }
 
-    /// Desglosa una tarea existente en subtareas accionables.
+    /// Desglosa una tarea existente en subtareas accionables usando IA on-device (con fallback heurístico).
     public func decomposeTask(_ task: ProjectTask, context: ModelContext) {
-        let generated = decompositionService.decomposeTaskIntoSubtasks(
-            taskTitle: task.title,
-            taskNotes: task.notes,
-            estimatedHours: task.estimatedHours
-        )
+        let taskTitle = task.title
+        let taskNotes = task.notes
+        let estHours = task.estimatedHours
 
-        for (idx, item) in generated.enumerated() {
-            let subtask = ProjectSubtask(
-                title: item.title,
-                notes: item.notes,
-                estimatedHours: item.hours,
-                sortOrder: (task.subtasks.map(\.sortOrder).max() ?? -1) + 1 + idx,
-                task: task
+        Task {
+            let generated = await decompositionService.decomposeTaskWithAI(
+                taskTitle: taskTitle,
+                taskNotes: taskNotes,
+                estimatedHours: estHours
             )
-            context.insert(subtask)
-            task.subtasks.append(subtask)
-        }
 
-        try? context.save()
+            for (idx, item) in generated.enumerated() {
+                let subtask = ProjectSubtask(
+                    title: item.title,
+                    notes: item.notes,
+                    estimatedHours: item.hours,
+                    sortOrder: (task.subtasks.map(\.sortOrder).max() ?? -1) + 1 + idx,
+                    task: task
+                )
+                context.insert(subtask)
+                task.subtasks.append(subtask)
+            }
+
+            try? context.save()
+        }
     }
 
     /// Añade una subtarea manual a una tarea.
@@ -298,6 +352,7 @@ public final class ProjectViewModel {
 
     /// Elimina una tarea individual.
     public func deleteTask(_ task: ProjectTask, context: ModelContext) {
+        NotificationService.shared.cancelNotification(for: task.id)
         context.delete(task)
         try? context.save()
     }
@@ -306,6 +361,9 @@ public final class ProjectViewModel {
     public func deleteProject(_ project: Project, context: ModelContext) {
         if selectedProject?.id == project.id {
             selectedProject = nil
+        }
+        for task in project.tasks {
+            NotificationService.shared.cancelNotification(for: task.id)
         }
         context.delete(project)
         try? context.save()

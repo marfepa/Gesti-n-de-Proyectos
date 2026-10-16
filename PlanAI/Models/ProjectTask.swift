@@ -20,6 +20,8 @@ public final class ProjectTask: Identifiable {
     public var fixedStartMinute: Int?
     public var fixedEndMinute: Int?
     public var iconName: String = "doc.fill"
+    public var colorToken: String?
+    public var alertOffsetMinutes: Int? = 5
     
     public var project: Project?
 
@@ -42,6 +44,8 @@ public final class ProjectTask: Identifiable {
         fixedStartMinute: Int? = nil,
         fixedEndMinute: Int? = nil,
         iconName: String = "doc.fill",
+        colorToken: String? = nil,
+        alertOffsetMinutes: Int? = 5,
         project: Project? = nil
     ) {
         self.id = id
@@ -59,8 +63,18 @@ public final class ProjectTask: Identifiable {
         self.fixedStartMinute = fixedStartMinute
         self.fixedEndMinute = fixedEndMinute
         self.iconName = iconName
+        self.colorToken = colorToken
+        self.alertOffsetMinutes = alertOffsetMinutes
         self.project = project
         self.subtasks = []
+    }
+
+    /// Token de color efectivo: usa el de la tarea si está definido, o hereda del proyecto contenedor.
+    public var effectiveColorToken: String {
+        if let colorToken, !colorToken.isEmpty {
+            return colorToken
+        }
+        return project?.colorToken ?? "coral"
     }
 
     /// Duración calculada en días entre la fecha de inicio y fin.
@@ -103,4 +117,3 @@ public final class ProjectTask: Identifiable {
         return subtasks.reduce(0.0) { $0 + $1.estimatedHours }
     }
 }
-

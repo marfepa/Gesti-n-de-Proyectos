@@ -13,6 +13,8 @@ public struct ProjectInputView: View {
     @State private var hasTargetEndDate: Bool = false
     @State private var targetEndDate: Date = Calendar.current.date(byAdding: .day, value: 30, to: Date()) ?? Date()
     @State private var priority: ProjectPriority = .media
+    @State private var colorToken: String = "coral"
+    @State private var iconName: String = "folder.fill"
 
     // Servicio nativo de grabación y transcripción (AVAudioRecorder + SFSpeech)
     @State private var transcriptionService = AudioTranscriptionService()
@@ -29,8 +31,8 @@ public struct ProjectInputView: View {
                     // Estado de Apple Intelligence
                     AIStatusBanner(service: viewModel.aiAvailability)
 
-                    // Nombre del Proyecto
-                    VStack(alignment: .leading, spacing: 6) {
+                    // Nombre del Proyecto e Identidad Visual
+                    VStack(alignment: .leading, spacing: 8) {
                         Text(String(localized: "Nombre del Proyecto"))
                             .font(.subheadline)
                             .fontWeight(.semibold)
@@ -40,6 +42,39 @@ public struct ProjectInputView: View {
                             text: $projectName
                         )
                         .textFieldStyle(.roundedBorder)
+
+                        HStack(spacing: 12) {
+                            Text(String(localized: "Color:"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            ForEach(StructuredColorToken.allCases) { token in
+                                Button {
+                                    colorToken = token.rawValue
+                                } label: {
+                                    Circle()
+                                        .fill(token.primaryColor)
+                                        .frame(width: 20, height: 20)
+                                        .overlay(
+                                            Image(systemName: colorToken == token.rawValue ? "checkmark" : "")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(.white)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Spacer()
+
+                            Picker(String(localized: "Icono"), selection: $iconName) {
+                                Label("Carpeta", systemImage: "folder.fill").tag("folder.fill")
+                                ForEach(StructuredTheme.curatedIcons, id: \.self) { icon in
+                                    Label(icon, systemImage: icon).tag(icon)
+                                }
+                            }
+                            .frame(width: 150)
+                        }
+                        .padding(.top, 2)
                     }
 
                     // Fechas y Prioridad
@@ -103,10 +138,8 @@ public struct ProjectInputView: View {
                                 .foregroundStyle(projectDescription.count > 1500 ? .orange : .secondary)
                         }
 
-                        // Barra de herramientas de grabación — flujo: Grabar → Detener y Transcribir (automático)
                         VStack(spacing: 8) {
                             HStack(spacing: 12) {
-                                // Selector de idioma
                                 HStack(spacing: 4) {
                                     Image(systemName: "globe")
                                         .font(.caption)
@@ -125,7 +158,6 @@ public struct ProjectInputView: View {
                                 Spacer()
 
                                 if transcriptionService.isRecording {
-                                    // Grabando → botón para detener Y transcribir automáticamente
                                     Button(action: stopAndTranscribe) {
                                         HStack(spacing: 6) {
                                             Image(systemName: "stop.circle.fill")
@@ -147,7 +179,6 @@ public struct ProjectInputView: View {
                                     .tint(.red)
 
                                 } else if !transcriptionService.isTranscribing {
-                                    // Idle → botón para iniciar grabación
                                     Button(action: startRecording) {
                                         HStack(spacing: 6) {
                                             Image(systemName: "mic.fill")
@@ -162,7 +193,6 @@ public struct ProjectInputView: View {
                                 }
                             }
 
-                            // Progreso de transcripción
                             if transcriptionService.isTranscribing {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 8) {
@@ -198,7 +228,6 @@ public struct ProjectInputView: View {
                         .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                        // Indicador REC animado
                         if transcriptionService.isRecording {
                             HStack(spacing: 8) {
                                 Circle()
@@ -216,7 +245,6 @@ public struct ProjectInputView: View {
                             .transition(.opacity)
                         }
 
-                        // Mensaje de error
                         if let error = transcriptionService.errorMessage {
                             Text(error)
                                 .font(.caption2)
@@ -224,7 +252,6 @@ public struct ProjectInputView: View {
                                 .padding(.horizontal, 4)
                         }
 
-                        // Editor de texto
                         TextEditor(text: $projectDescription)
                             .frame(minHeight: 120)
                             .padding(6)
@@ -257,6 +284,8 @@ public struct ProjectInputView: View {
                                     startDate: startDate,
                                     targetEndDate: effectiveTarget,
                                     priority: priority,
+                                    colorToken: colorToken,
+                                    iconName: iconName,
                                     context: modelContext
                                 )
                             }
@@ -291,6 +320,8 @@ public struct ProjectInputView: View {
                                 startDate: startDate,
                                 targetEndDate: effectiveTarget,
                                 priority: priority,
+                                colorToken: colorToken,
+                                iconName: iconName,
                                 context: modelContext
                             )
                         }) {
@@ -313,7 +344,7 @@ public struct ProjectInputView: View {
                     .disabled(viewModel.isDecomposing)
                 }
             }
-            .frame(minWidth: 520, minHeight: 520)
+            .frame(minWidth: 520, minHeight: 540)
             .alert(
                 String(localized: "Error al generar plan"),
                 isPresented: Binding(
@@ -329,7 +360,6 @@ public struct ProjectInputView: View {
                 transcriptionService.cancel()
             }
             .onChange(of: transcriptionService.phase) { _, newPhase in
-                // Cuando la transcripción completa, insertar el texto en la descripción
                 if case .completed = newPhase {
                     let clean = transcriptionService.transcribedText
                         .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -343,14 +373,11 @@ public struct ProjectInputView: View {
                     } else {
                         projectDescription = baseDescriptionBeforeRecording + "\n\n" + clean
                     }
-                    // Resetear para permitir nueva grabación
                     transcriptionService.resetAfterCompletion()
                 }
             }
         }
     }
-
-    // MARK: - Acciones de grabación
 
     private func startRecording() {
         baseDescriptionBeforeRecording = projectDescription.trimmingCharacters(in: .whitespacesAndNewlines)

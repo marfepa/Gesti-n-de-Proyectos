@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Modal para editar la información completa del proyecto: Nombre, Descripción, Fechas y Prioridad.
+/// Modal para editar la información completa del proyecto: Nombre, Descripción, Fechas, Prioridad, Color e Icono.
 public struct ProjectEditSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -15,6 +15,8 @@ public struct ProjectEditSheet: View {
     @State private var hasTargetEndDate: Bool
     @State private var targetEndDate: Date
     @State private var priority: ProjectPriority
+    @State private var colorToken: String
+    @State private var iconName: String
 
     public init(project: Project, viewModel: ProjectViewModel) {
         self.project = project
@@ -25,6 +27,8 @@ public struct ProjectEditSheet: View {
         _hasTargetEndDate = State(initialValue: project.targetEndDate != nil)
         _targetEndDate = State(initialValue: project.targetEndDate ?? project.estimatedEndDate)
         _priority = State(initialValue: project.priority)
+        _colorToken = State(initialValue: project.colorToken)
+        _iconName = State(initialValue: project.iconName)
     }
 
     public var body: some View {
@@ -38,10 +42,39 @@ public struct ProjectEditSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextEditor(text: $description)
-                            .frame(minHeight: 80)
+                            .frame(minHeight: 70)
                             .padding(4)
                             .background(Color(nsColor: .textBackgroundColor))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+
+                Section(header: Text(String(localized: "Identidad Visual (Structured)"))) {
+                    HStack(spacing: 10) {
+                        Text(String(localized: "Color:"))
+                        Spacer()
+                        ForEach(StructuredColorToken.allCases) { token in
+                            Button {
+                                colorToken = token.rawValue
+                            } label: {
+                                Circle()
+                                    .fill(token.primaryColor)
+                                    .frame(width: 22, height: 22)
+                                    .overlay(
+                                        Image(systemName: colorToken == token.rawValue ? "checkmark" : "")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Picker(String(localized: "Icono"), selection: $iconName) {
+                        Label("Carpeta", systemImage: "folder.fill").tag("folder.fill")
+                        ForEach(StructuredTheme.curatedIcons, id: \.self) { icon in
+                            Label(icon, systemImage: icon).tag(icon)
+                        }
                     }
                 }
 
@@ -99,6 +132,8 @@ public struct ProjectEditSheet: View {
                             startDate: startDate,
                             targetEndDate: hasTargetEndDate ? targetEndDate : nil,
                             priority: priority,
+                            colorToken: colorToken,
+                            iconName: iconName,
                             context: modelContext
                         )
                         dismiss()
@@ -106,7 +141,7 @@ public struct ProjectEditSheet: View {
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .frame(minWidth: 420, minHeight: 380)
+            .frame(minWidth: 440, minHeight: 440)
         }
     }
 }
