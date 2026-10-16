@@ -118,4 +118,15 @@ final class TaskDecompositionTests: XCTestCase {
         XCTAssertEqual(payloads[0].subtasks[0].notes, "Crear migraciones y tablas de usuarios")
         XCTAssertEqual(payloads[0].estimatedHours, 8.0)
     }
+
+    func testQuickSchedulePromptHeuristicParsing() {
+        let service = TaskDecompositionService()
+        let parsed = service.parseHeuristicQuickPrompt("Diseño UI en Figma a las 11:30 por 45 min", defaultStartMinute: 600)
+
+        XCTAssertEqual(parsed.startMinute, 11 * 60 + 30)
+        XCTAssertEqual(parsed.durationMinutes, 45)
+        XCTAssertEqual(parsed.iconName, "paintbrush.fill")
+        XCTAssertEqual(parsed.colorToken, "lavender")
+    }
 }
+

@@ -1,5 +1,18 @@
 import Foundation
 
+/// Resumen ligero de subtarea para mostrar checklists interactivos dentro del Timeline.
+public struct ScheduledSubtaskSummary: Identifiable, Sendable, Equatable {
+    public var id: UUID
+    public var title: String
+    public var isCompleted: Bool
+
+    public init(id: UUID, title: String, isCompleted: Bool) {
+        self.id = id
+        self.title = title
+        self.isCompleted = isCompleted
+    }
+}
+
 /// Representa una asignación concreta de una tarea a un día y bloque horario.
 public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public var id: UUID
@@ -8,6 +21,8 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public var subtaskId: UUID?
     public var taskTitle: String
     public var subtaskTitle: String?
+    public var taskNotes: String
+    public var subtaskNotes: String?
     public var projectName: String
     public var projectPriority: ProjectPriority
     public var date: Date
@@ -16,6 +31,9 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
     public var allocatedHours: Double
     public var isCompleted: Bool
     public var iconName: String
+    public var colorToken: String
+    public var subtaskItems: [ScheduledSubtaskSummary]
+    public var isExternalCalendarEvent: Bool
 
     public init(
         id: UUID = UUID(),
@@ -24,6 +42,8 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         subtaskId: UUID? = nil,
         taskTitle: String,
         subtaskTitle: String? = nil,
+        taskNotes: String = "",
+        subtaskNotes: String? = nil,
         projectName: String,
         projectPriority: ProjectPriority = .media,
         date: Date,
@@ -31,7 +51,10 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         endMinute: Int,
         allocatedHours: Double,
         isCompleted: Bool,
-        iconName: String = "doc.fill"
+        iconName: String = "doc.fill",
+        colorToken: String = "coral",
+        subtaskItems: [ScheduledSubtaskSummary] = [],
+        isExternalCalendarEvent: Bool = false
     ) {
         self.id = id
         self.taskId = taskId
@@ -39,6 +62,8 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         self.subtaskId = subtaskId
         self.taskTitle = taskTitle
         self.subtaskTitle = subtaskTitle
+        self.taskNotes = taskNotes
+        self.subtaskNotes = subtaskNotes
         self.projectName = projectName
         self.projectPriority = projectPriority
         self.date = date
@@ -47,6 +72,9 @@ public struct ScheduledItem: Identifiable, Sendable, Equatable {
         self.allocatedHours = allocatedHours
         self.isCompleted = isCompleted
         self.iconName = iconName
+        self.colorToken = colorToken
+        self.subtaskItems = subtaskItems
+        self.isExternalCalendarEvent = isExternalCalendarEvent
     }
 
     public var displayTitle: String {
@@ -112,14 +140,63 @@ public struct ScheduleResult: Sendable, Equatable {
     }
 }
 
-/// Motor determinista de asignación de tareas a bloques semanales + soporte de eventos con hora fija.
+/// Motor determinista de asignación de tareas a bloques semanales + soporte de eventos con hora fija y carving de huecos.
 public final class WeeklySchedulerService: Sendable {
 
     public init() {}
 
+    /// Encuentra el primer hueco libre en un día dado que pueda alojar `durationMinutes` sin solaparse con `existingItems`.
+    public func findNextAvailableGap(
+        on date: Date,
+        durationMinutes: Int,
+        existingItems: [ScheduledItem],
+        wakeUpMinute: Int = 375,
+        windDownMinute: Int = 1305,
+        preferredStartMinute: Int = 540,
+        calendar: Calendar = .current
+    ) -> Int {
+        let dayItems = existingItems
+            .filter { calendar.isDate($0.date, inSameDayAs: date) }
+            .sorted { $0.startMinute < $1.startMinute }
+
+        let needed = max(15, durationMinutes)
+        var candidateStart = max(wakeUpMinute, preferredStartMinute)
+
+        for item in dayItems {
+            let candidateEnd = candidateStart + needed
+            if candidateEnd <= item.startMinute {
+                return candidateStart
+            }
+            if candidateStart < item.endMinute {
+                // Redondear al siguiente múltiplo de 5 minutos tras el fin de la tarea existente
+                let rawNext = item.endMinute
+                let rem = rawNext % 5
+                candidateStart = rem == 0 ? rawNext : rawNext + (5 - rem)
+            }
+        }
+
+        if candidateStart + needed <= windDownMinute {
+            return candidateStart
+        }
+
+        // Segunda pasada desde wakeUpMinute por si había hueco temprano antes de preferredStartMinute
+        var earlyCandidate = wakeUpMinute
+        for item in dayItems {
+            if earlyCandidate + needed <= item.startMinute {
+                return earlyCandidate
+            }
+            if earlyCandidate < item.endMinute {
+                earlyCandidate = item.endMinute
+            }
+        }
+
+        return min(max(wakeUpMinute, candidateStart), max(wakeUpMinute, 1410 - needed))
+    }
+
     public func schedule(
         projects: [Project],
         slots: [WorkSlot],
+        externalEvents: [ScheduledItem] = [],
         startDate: Date = Date(),
         weeksToSchedule: Int = 2,
         safetyBufferPercent: Double = 0.15,
@@ -140,7 +217,7 @@ public final class WeeklySchedulerService: Sendable {
         }
 
         var candidates: [TaskCandidate] = []
-        var fixedScheduledItems: [ScheduledItem] = []
+        var fixedScheduledItems: [ScheduledItem] = externalEvents
         var totalDemand: Double = 0.0
         var totalAllocatedHours: Double = 0.0
 
@@ -150,6 +227,10 @@ public final class WeeklySchedulerService: Sendable {
             let priority = project.priority
 
             for task in activeTasks {
+                let subtaskSummaries = task.sortedSubtasks.map {
+                    ScheduledSubtaskSummary(id: $0.id, title: $0.title, isCompleted: $0.isCompleted)
+                }
+
                 // 1. Tareas con hora fija agendadas directamente en el Timeline (estilo Structured)
                 if task.hasFixedTime, let fStart = task.fixedStartMinute, let fEnd = task.fixedEndMinute {
                     let durationMin = max(1, fEnd - fStart)
@@ -162,6 +243,8 @@ public final class WeeklySchedulerService: Sendable {
                             subtaskId: nil,
                             taskTitle: task.title,
                             subtaskTitle: task.subtasks.isEmpty ? nil : "\(task.subtasks.filter(\.isCompleted).count)/\(task.subtasks.count) subtasks",
+                            taskNotes: task.notes,
+                            subtaskNotes: nil,
                             projectName: project.name,
                             projectPriority: priority,
                             date: targetDate,
@@ -169,7 +252,9 @@ public final class WeeklySchedulerService: Sendable {
                             endMinute: fEnd,
                             allocatedHours: hours,
                             isCompleted: task.isCompleted,
-                            iconName: task.iconName
+                            iconName: task.iconName,
+                            colorToken: task.effectiveColorToken,
+                            subtaskItems: subtaskSummaries
                         )
                     )
                     if !task.isCompleted {
@@ -280,23 +365,56 @@ public final class WeeklySchedulerService: Sendable {
                 .filter { $0.weekday == weekday }
                 .sorted { $0.startMinute < $1.startMinute }
 
+            // Eventos y tareas de hora fija en este día concreto (no completados) que bloquean capacidad
+            let dayFixedIntervals: [(start: Int, end: Int)] = fixedScheduledItems
+                .filter { !$0.isCompleted && calendar.isDate($0.date, inSameDayAs: slotDate) }
+                .map { (start: $0.startMinute, end: $0.endMinute) }
+                .sorted { $0.start < $1.start }
+
             for s in matchingSlots {
                 let grossMinutes = s.durationMinutes
                 let bufferMinutes = Int(Double(grossMinutes) * safetyBufferPercent)
                 let netMinutes = max(15, grossMinutes - bufferMinutes)
+                let slotStart = s.startMinute
+                let slotEnd = s.startMinute + netMinutes
 
-                totalAvailableHours += Double(netMinutes) / 60.0
+                // Recortar (carve out) cualquier intervalo fijo que solape con este WorkSlot
+                var freeSegments: [(start: Int, end: Int)] = [(start: slotStart, end: slotEnd)]
+                for fixed in dayFixedIntervals {
+                    var nextSegments: [(start: Int, end: Int)] = []
+                    for seg in freeSegments {
+                        // Sin solapamiento
+                        if fixed.end <= seg.start || fixed.start >= seg.end {
+                            nextSegments.append(seg)
+                        } else {
+                            // Tramo anterior libre
+                            if fixed.start > seg.start {
+                                nextSegments.append((start: seg.start, end: fixed.start))
+                            }
+                            // Tramo posterior libre
+                            if fixed.end < seg.end {
+                                nextSegments.append((start: fixed.end, end: seg.end))
+                            }
+                        }
+                    }
+                    freeSegments = nextSegments
+                }
 
-                concreteSlots.append(
-                    ConcreteSlot(
-                        date: slotDate,
-                        startMinute: s.startMinute,
-                        endMinute: s.startMinute + netMinutes,
-                        usableMinutes: netMinutes,
-                        remainingMinutes: netMinutes,
-                        currentCursorMinute: s.startMinute
+                for seg in freeSegments {
+                    let segDuration = seg.end - seg.start
+                    guard segDuration >= 15 else { continue }
+                    totalAvailableHours += Double(segDuration) / 60.0
+                    concreteSlots.append(
+                        ConcreteSlot(
+                            date: slotDate,
+                            startMinute: seg.start,
+                            endMinute: seg.end,
+                            usableMinutes: segDuration,
+                            remainingMinutes: segDuration,
+                            currentCursorMinute: seg.start
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -317,21 +435,31 @@ public final class WeeklySchedulerService: Sendable {
                 let endMin = startMin + minutesToAssign
                 let assignedHours = Double(minutesToAssign) / 60.0
 
+                let candidateTask = candidates[candidateIndex].task
+                let candidateSub = candidates[candidateIndex].subtask
+                let summaries = candidateTask.sortedSubtasks.map {
+                    ScheduledSubtaskSummary(id: $0.id, title: $0.title, isCompleted: $0.isCompleted)
+                }
+
                 scheduledItems.append(
                     ScheduledItem(
-                        taskId: candidates[candidateIndex].task.id,
+                        taskId: candidateTask.id,
                         projectId: candidates[candidateIndex].projectId,
-                        subtaskId: candidates[candidateIndex].subtask?.id,
-                        taskTitle: candidates[candidateIndex].task.title,
-                        subtaskTitle: candidates[candidateIndex].subtask?.title,
+                        subtaskId: candidateSub?.id,
+                        taskTitle: candidateTask.title,
+                        subtaskTitle: candidateSub?.title,
+                        taskNotes: candidateTask.notes,
+                        subtaskNotes: candidateSub?.notes,
                         projectName: candidates[candidateIndex].projectName,
                         projectPriority: candidates[candidateIndex].projectPriority,
                         date: currentSlot.date,
                         startMinute: startMin,
                         endMinute: endMin,
                         allocatedHours: assignedHours,
-                        isCompleted: candidates[candidateIndex].subtask?.isCompleted ?? candidates[candidateIndex].task.isCompleted,
-                        iconName: candidates[candidateIndex].task.iconName
+                        isCompleted: candidateSub?.isCompleted ?? candidateTask.isCompleted,
+                        iconName: candidateTask.iconName,
+                        colorToken: candidateTask.effectiveColorToken,
+                        subtaskItems: summaries
                     )
                 )
 
@@ -370,4 +498,3 @@ public final class WeeklySchedulerService: Sendable {
         )
     }
 }
-

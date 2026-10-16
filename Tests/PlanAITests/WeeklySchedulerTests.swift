@@ -476,4 +476,99 @@ final class WeeklySchedulerTests: XCTestCase {
         XCTAssertEqual(pos3.totalColumns, 1)
         XCTAssertEqual(pos3.columnIndex, 0)
     }
+
+    func testFixedTimeTaskCarvesOutWorkSlotSoAutoTaskDoesNotOverlap() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))! // Lunes
+
+        // Proyecto con 1 tarea de hora fija (10:00 - 11:00) y 1 tarea automática (1.0h)
+        let project = Project(name: "Proyecto Mixto", startDate: refDate, priority: .alta, colorToken: "ocean")
+        let fixedTask = ProjectTask(
+            title: "Reunión Fija",
+            startDate: refDate,
+            endDate: refDate,
+            estimatedHours: 1.0,
+            sortOrder: 0,
+            scheduledDate: refDate,
+            hasFixedTime: true,
+            fixedStartMinute: 10 * 60, // 10:00
+            fixedEndMinute: 11 * 60,   // 11:00
+            iconName: "person.2.fill",
+            colorToken: "amber",
+            project: project
+        )
+        let autoTask = ProjectTask(
+            title: "Desarrollo Automático",
+            startDate: refDate,
+            endDate: refDate,
+            estimatedHours: 1.0,
+            sortOrder: 1,
+            project: project
+        )
+        project.tasks = [fixedTask, autoTask]
+
+        // WorkSlot de 10:00 a 12:00 el Lunes (sin buffer).
+        // Como 10:00-11:00 está ocupado por Reunión Fija, la tarea automática DEBE programarse de 11:00 a 12:00.
+        let slot = WorkSlot(weekday: 2, startMinute: 10 * 60, endMinute: 12 * 60)
+
+        let result = service.schedule(
+            projects: [project],
+            slots: [slot],
+            startDate: refDate,
+            weeksToSchedule: 1,
+            safetyBufferPercent: 0.0,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(result.scheduledItems.count, 2)
+        let scheduledAuto = result.scheduledItems.first { $0.taskTitle == "Desarrollo Automático" }
+        XCTAssertNotNil(scheduledAuto)
+        XCTAssertEqual(scheduledAuto?.startMinute, 11 * 60)
+        XCTAssertEqual(scheduledAuto?.endMinute, 12 * 60)
+        // Verifica herencia de colorToken del proyecto
+        XCTAssertEqual(scheduledAuto?.colorToken, "ocean")
+    }
+
+    func testFindNextAvailableGapSkipsOccupiedIntervals() {
+        let service = WeeklySchedulerService()
+        let refDate = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))!
+
+        let existing = [
+            ScheduledItem(
+                taskId: UUID(),
+                taskTitle: "Bloque 1",
+                projectName: "P1",
+                date: refDate,
+                startMinute: 540, // 09:00
+                endMinute: 600,   // 10:00
+                allocatedHours: 1.0,
+                isCompleted: false
+            ),
+            ScheduledItem(
+                taskId: UUID(),
+                taskTitle: "Bloque 2",
+                projectName: "P1",
+                date: refDate,
+                startMinute: 610, // 10:10
+                endMinute: 660,   // 11:00
+                allocatedHours: 0.8,
+                isCompleted: false
+            )
+        ]
+
+        // Buscamos hueco para una tarea de 30 min empezando a partir de las 09:00 (540).
+        // Entre 10:00 y 10:10 solo hay 10 min, por lo que debe saltar hasta las 11:00 (660).
+        let nextStart = service.findNextAvailableGap(
+            on: refDate,
+            durationMinutes: 30,
+            existingItems: existing,
+            wakeUpMinute: 375,
+            windDownMinute: 1305,
+            preferredStartMinute: 540,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(nextStart, 660)
+    }
 }
+
