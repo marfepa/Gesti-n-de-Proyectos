@@ -41,6 +41,8 @@ public final class Project: Identifiable {
     public var targetEndDate: Date?
     public var createdAt: Date = Date()
     public var priorityRawValue: Int = ProjectPriority.media.rawValue
+    public var colorToken: String = "coral"
+    public var iconName: String = "folder.fill"
 
     public var priority: ProjectPriority {
         get { ProjectPriority(rawValue: priorityRawValue) ?? .media }
@@ -57,7 +59,9 @@ public final class Project: Identifiable {
         startDate: Date = Date(),
         targetEndDate: Date? = nil,
         createdAt: Date = Date(),
-        priority: ProjectPriority = .media
+        priority: ProjectPriority = .media,
+        colorToken: String = "coral",
+        iconName: String = "folder.fill"
     ) {
         self.id = id
         self.name = name
@@ -66,6 +70,8 @@ public final class Project: Identifiable {
         self.targetEndDate = targetEndDate
         self.createdAt = createdAt
         self.priorityRawValue = priority.rawValue
+        self.colorToken = colorToken
+        self.iconName = iconName
         self.tasks = []
     }
 

@@ -1,5 +1,61 @@
 import SwiftUI
 
+/// Token de color personalizable estilo Structured para proyectos, tareas y tema de acento.
+public enum StructuredColorToken: String, CaseIterable, Identifiable, Codable, Sendable {
+    case coral = "coral"
+    case ocean = "ocean"
+    case teal = "teal"
+    case lavender = "lavender"
+    case amber = "amber"
+    case mint = "mint"
+    case nightNavy = "nightNavy"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .coral: return String(localized: "Coral")
+        case .ocean: return String(localized: "Océano")
+        case .teal: return String(localized: "Turquesa")
+        case .lavender: return String(localized: "Lavanda")
+        case .amber: return String(localized: "Ámbar")
+        case .mint: return String(localized: "Menta")
+        case .nightNavy: return String(localized: "Noche")
+        }
+    }
+
+    public var primaryColor: Color {
+        switch self {
+        case .coral: return StructuredTheme.coral
+        case .ocean: return StructuredTheme.ocean
+        case .teal: return StructuredTheme.teal
+        case .lavender: return StructuredTheme.lavender
+        case .amber: return StructuredTheme.amber
+        case .mint: return StructuredTheme.mint
+        case .nightNavy: return StructuredTheme.nightNavy
+        }
+    }
+
+    public var lightColor: Color {
+        switch self {
+        case .coral: return StructuredTheme.coralLight
+        case .ocean: return StructuredTheme.ocean.opacity(0.16)
+        case .teal: return StructuredTheme.teal.opacity(0.16)
+        case .lavender: return StructuredTheme.lavender.opacity(0.16)
+        case .amber: return StructuredTheme.amber.opacity(0.16)
+        case .mint: return StructuredTheme.mint.opacity(0.16)
+        case .nightNavy: return StructuredTheme.nightNavyLight
+        }
+    }
+
+    public static func resolve(_ raw: String?) -> StructuredColorToken {
+        guard let raw, let token = StructuredColorToken(rawValue: raw) else {
+            return .coral
+        }
+        return token
+    }
+}
+
 /// Sistema de diseño exacto de Structured.
 /// Recrea fielmente la paleta coral/salmón, el azul marino nocturno,
 /// el lienzo gris cálido, las tarjetas blancas flotantes con radio de 32pt
@@ -22,6 +78,14 @@ public enum StructuredTheme {
     public static let lavender = Color(red: 0.68, green: 0.55, blue: 0.94)
     public static let amber = Color(red: 1.0, green: 0.65, blue: 0.25)
     public static let mint = Color(red: 0.30, green: 0.80, blue: 0.55)
+
+    /// Catálogo de iconos SF Symbols recomendados para tareas y proyectos
+    public static let curatedIcons: [String] = [
+        "doc.fill", "at", "laptopcomputer", "person.2.fill",
+        "paintbrush.fill", "figure.run", "cart.fill", "book.fill",
+        "phone.fill", "sparkles", "terminal.fill", "checklist",
+        "server.rack", "chart.bar.fill", "checkmark.shield.fill", "cup.and.saucer.fill"
+    ]
 
     // MARK: - Fondos y Superficies de Structured
     /// Lienzo exterior (gris suave/cálido de Structured)
@@ -55,6 +119,16 @@ public enum StructuredTheme {
         case .alta: return amber
         case .urgente: return Color(red: 0.95, green: 0.25, blue: 0.25)
         }
+    }
+
+    /// Devuelve el color primario asociado a un token de color
+    public static func color(forToken token: String?) -> Color {
+        StructuredColorToken.resolve(token).primaryColor
+    }
+
+    /// Devuelve el color claro de fondo asociado a un token de color
+    public static func lightColor(forToken token: String?) -> Color {
+        StructuredColorToken.resolve(token).lightColor
     }
 }
 
