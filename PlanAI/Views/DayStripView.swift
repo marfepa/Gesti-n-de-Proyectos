@@ -4,8 +4,10 @@ public struct DayStripView: View {
     @Binding public var selectedDate: Date
     @Binding public var isSheetExpanded: Bool
     public var scheduledItems: [ScheduledItem]
+    public var accentColor: Color = StructuredTheme.coral
+    public var accentLightColor: Color = StructuredTheme.coralLight
     public var onOpenAI: () -> Void = {}
-    public var onOpenSearch: () -> Void = {}
+    public var onToggleSearch: () -> Void = {}
     public var onOpenSettings: () -> Void = {}
 
     @State private var showingDatePickerPopover: Bool = false
@@ -15,15 +17,19 @@ public struct DayStripView: View {
         selectedDate: Binding<Date>,
         isSheetExpanded: Binding<Bool> = .constant(true),
         scheduledItems: [ScheduledItem],
+        accentColor: Color = StructuredTheme.coral,
+        accentLightColor: Color = StructuredTheme.coralLight,
         onOpenAI: @escaping () -> Void = {},
-        onOpenSearch: @escaping () -> Void = {},
+        onToggleSearch: @escaping () -> Void = {},
         onOpenSettings: @escaping () -> Void = {}
     ) {
         self._selectedDate = selectedDate
         self._isSheetExpanded = isSheetExpanded
         self.scheduledItems = scheduledItems
+        self.accentColor = accentColor
+        self.accentLightColor = accentLightColor
         self.onOpenAI = onOpenAI
-        self.onOpenSearch = onOpenSearch
+        self.onToggleSearch = onToggleSearch
         self.onOpenSettings = onOpenSettings
     }
 
@@ -46,7 +52,7 @@ public struct DayStripView: View {
 
     private var monthOnlyString: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale.current
         formatter.dateFormat = "MMMM"
         let str = formatter.string(from: selectedDate)
         return str.prefix(1).uppercased() + str.dropFirst()
@@ -54,7 +60,7 @@ public struct DayStripView: View {
 
     private var monthAndDayString: String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale.current
         formatter.dateFormat = "MMMM d,"
         let str = formatter.string(from: selectedDate)
         return str.prefix(1).uppercased() + str.dropFirst()
@@ -62,13 +68,14 @@ public struct DayStripView: View {
 
     private var yearString: String {
         let formatter = DateFormatter()
+        formatter.locale = Locale.current
         formatter.dateFormat = "yyyy"
         return formatter.string(from: selectedDate)
     }
 
     public var body: some View {
         VStack(spacing: 12) {
-            // 1. Fila Superior: Título dinámico ("Octubre 2026 >" o "Octubre 15, 2026 >") + Utilidades
+            // 1. Fila Superior: Título dinámico + Utilidades
             ZStack {
                 HStack(spacing: 12) {
                     Button {
@@ -82,7 +89,7 @@ public struct DayStripView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .help("Semana anterior")
+                    .help(String(localized: "Semana anterior"))
 
                     Button {
                         showingDatePickerPopover.toggle()
@@ -94,10 +101,10 @@ public struct DayStripView: View {
                                 .contentTransition(.numericText())
                             Text(yearString)
                                 .font(.system(size: 23, weight: .bold, design: .rounded))
-                                .foregroundStyle(StructuredTheme.coral)
+                                .foregroundStyle(accentColor)
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(StructuredTheme.coral)
+                                .foregroundStyle(accentColor)
                         }
                     }
                     .buttonStyle(.plain)
@@ -112,7 +119,7 @@ public struct DayStripView: View {
                             }
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .buttonStyle(.borderedProminent)
-                            .tint(StructuredTheme.coral)
+                            .tint(accentColor)
                             .padding(.bottom, 10)
                         }
                         .frame(width: 280)
@@ -129,7 +136,7 @@ public struct DayStripView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .help("Semana siguiente")
+                    .help(String(localized: "Semana siguiente"))
                 }
 
                 HStack(spacing: 8) {
@@ -149,10 +156,10 @@ public struct DayStripView: View {
                         .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .help("Descomponer proyecto con Apple Intelligence")
+                    .help(String(localized: "Descomponer proyecto con Apple Intelligence"))
 
-                    Button(action: onOpenSearch) {
-                        Image(systemName: isSheetExpanded ? "calendar.day.timeline.left" : "magnifyingglass")
+                    Button(action: onToggleSearch) {
+                        Image(systemName: "magnifyingglass")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Color.primary.opacity(0.65))
                             .frame(width: 28, height: 28)
@@ -160,7 +167,22 @@ public struct DayStripView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .help("Alternar vista semanal / diaria")
+                    .help(String(localized: "Buscar tareas en el día"))
+
+                    Button {
+                        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+                            isSheetExpanded.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isSheetExpanded ? "calendar.day.timeline.left" : "rectangle.expand.vertical")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.primary.opacity(0.65))
+                            .frame(width: 28, height: 28)
+                            .background(Color.primary.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(String(localized: "Alternar vista de tallos semanales / hoja diaria"))
 
                     Button(action: onOpenSettings) {
                         Image(systemName: "gearshape.fill")
@@ -171,12 +193,12 @@ public struct DayStripView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .help("Ajustes de Structured / PlanAI")
+                    .help(String(localized: "Ajustes de Structured / PlanAI"))
                 }
             }
             .padding(.horizontal, 24)
 
-            // 2. Fila de los 7 días (Con height: 1 en el espaciador para evitar que Color.clear expanda el HStack)
+            // 2. Fila de los 7 días
             HStack(spacing: 0) {
                 if !isSheetExpanded {
                     Color.clear.frame(width: 48, height: 1)
@@ -232,12 +254,12 @@ public struct DayStripView: View {
                 VStack(spacing: 4) {
                     Text(weekdayLabel)
                         .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .rounded))
-                        .foregroundStyle(isSelected ? StructuredTheme.coral : .secondary)
+                        .foregroundStyle(isSelected ? accentColor : .secondary)
 
                     ZStack {
                         if isSelected {
                             Circle()
-                                .fill(StructuredTheme.coral)
+                                .fill(accentColor)
                                 .frame(width: 30, height: 30)
                             Text("\(dayNum)")
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -254,13 +276,13 @@ public struct DayStripView: View {
                 .padding(.horizontal, 7)
                 .background(
                     Capsule()
-                        .fill(isSelected ? StructuredTheme.coralLight : Color.clear)
+                        .fill(isSelected ? accentLightColor : Color.clear)
                 )
 
                 if isSheetExpanded {
                     HStack(spacing: 3) {
                         Circle()
-                            .fill(StructuredTheme.coral.opacity(0.85))
+                            .fill(accentColor.opacity(0.85))
                             .frame(width: 11, height: 11)
                             .overlay(
                                 Image(systemName: "alarm.fill")
@@ -269,16 +291,18 @@ public struct DayStripView: View {
                             )
 
                         ForEach(itemsForDay.prefix(3)) { item in
+                            let itemColor = StructuredTheme.color(forToken: item.colorToken)
+                            let itemLight = StructuredTheme.lightColor(forToken: item.colorToken)
                             Circle()
-                                .fill(StructuredTheme.coralLight)
+                                .fill(itemLight)
                                 .frame(width: 11, height: 11)
                                 .overlay(
                                     Image(systemName: item.iconName)
                                         .font(.system(size: 5.5, weight: .bold))
-                                        .foregroundStyle(StructuredTheme.coral)
+                                        .foregroundStyle(itemColor)
                                 )
                                 .overlay(
-                                    Circle().stroke(StructuredTheme.coral.opacity(0.6), lineWidth: 0.8)
+                                    Circle().stroke(itemColor.opacity(0.6), lineWidth: 0.8)
                                 )
                         }
 
@@ -302,7 +326,7 @@ public struct DayStripView: View {
 
     private func shortWeekday(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale.current
         formatter.dateFormat = "EEE"
         let str = formatter.string(from: date).replacingOccurrences(of: ".", with: "")
         return str.prefix(1).uppercased() + str.dropFirst()

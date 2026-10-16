@@ -2,16 +2,26 @@ import SwiftUI
 import SwiftData
 
 public struct DailyTimelineView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     public let result: ScheduleResult
     public let workSlots: [WorkSlot]
     @Binding public var selectedDate: Date
     @Binding public var isSheetExpanded: Bool
+    public var searchFilter: String = ""
+    public var wakeUpMinute: Int = 375
+    public var windDownMinute: Int = 1305
+    public var accentColor: Color = StructuredTheme.coral
+    public var accentLightColor: Color = StructuredTheme.coralLight
     public var onToggleItem: (ScheduledItem) -> Void = { _ in }
+    public var onToggleSubtask: (UUID) -> Void = { _ in }
+    public var onEditItem: (ScheduledItem) -> Void = { _ in }
     public var onAddNewTask: (Int?) -> Void = { _ in }
     public var onOpenAI: () -> Void = {}
-    public var onDropInboxTask: (String) -> Void = { _ in }
+    public var onDropInboxTask: (String, Int?) -> Void = { _, _ in }
 
     @State private var selectedItemForPopover: ScheduledItem?
+    @State private var expandedSubtaskItemIds: Set<UUID> = []
     @State private var currentTime = Date()
     @GestureState private var dragTranslation: CGFloat = 0
 
@@ -20,16 +30,30 @@ public struct DailyTimelineView: View {
         workSlots: [WorkSlot],
         selectedDate: Binding<Date>,
         isSheetExpanded: Binding<Bool> = .constant(true),
+        searchFilter: String = "",
+        wakeUpMinute: Int = 375,
+        windDownMinute: Int = 1305,
+        accentColor: Color = StructuredTheme.coral,
+        accentLightColor: Color = StructuredTheme.coralLight,
         onToggleItem: @escaping (ScheduledItem) -> Void = { _ in },
+        onToggleSubtask: @escaping (UUID) -> Void = { _ in },
+        onEditItem: @escaping (ScheduledItem) -> Void = { _ in },
         onAddNewTask: @escaping (Int?) -> Void = { _ in },
         onOpenAI: @escaping () -> Void = {},
-        onDropInboxTask: @escaping (String) -> Void = { _ in }
+        onDropInboxTask: @escaping (String, Int?) -> Void = { _, _ in }
     ) {
         self.result = result
         self.workSlots = workSlots
         self._selectedDate = selectedDate
         self._isSheetExpanded = isSheetExpanded
+        self.searchFilter = searchFilter
+        self.wakeUpMinute = wakeUpMinute
+        self.windDownMinute = windDownMinute
+        self.accentColor = accentColor
+        self.accentLightColor = accentLightColor
         self.onToggleItem = onToggleItem
+        self.onToggleSubtask = onToggleSubtask
+        self.onEditItem = onEditItem
         self.onAddNewTask = onAddNewTask
         self.onOpenAI = onOpenAI
         self.onDropInboxTask = onDropInboxTask
@@ -49,7 +73,14 @@ public struct DailyTimelineView: View {
 
     private var dayItems: [ScheduledItem] {
         result.scheduledItems
-            .filter { calendar.isDate($0.date, inSameDayAs: selectedDate) }
+            .filter { item in
+                guard calendar.isDate(item.date, inSameDayAs: selectedDate) else { return false }
+                let trimmed = searchFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty { return true }
+                return item.taskTitle.localizedCaseInsensitiveContains(trimmed)
+                    || item.projectName.localizedCaseInsensitiveContains(trimmed)
+                    || (item.subtaskTitle?.localizedCaseInsensitiveContains(trimmed) ?? false)
+            }
             .sorted {
                 if $0.startMinute == $1.startMinute {
                     return ($0.endMinute - $0.startMinute) > ($1.endMinute - $1.startMinute)
@@ -120,29 +151,29 @@ public struct DailyTimelineView: View {
                             .padding(.bottom, 14)
                     }
                 }
-                .background(StructuredTheme.sheetBackground(for: .light))
+                .background(StructuredTheme.sheetBackground(for: colorScheme))
                 .clipShape(RoundedRectangle(cornerRadius: StructuredTheme.sheetCornerRadius, style: .continuous))
-                .shadow(color: Color.black.opacity(0.08), radius: 18, y: -2)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.08), radius: 18, y: -2)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
                 .offset(y: max(-20, min(120, dragTranslation * 0.35)))
                 .dropDestination(for: String.self) { droppedIds, _ in
                     if let firstId = droppedIds.first {
-                        onDropInboxTask(firstId)
+                        onDropInboxTask(firstId, nil)
                         return true
                     }
                     return false
                 }
 
-                // Botón flotante coral (+) en la esquina inferior derecha
+                // Botón flotante (+) en la esquina inferior derecha
                 Button {
                     onAddNewTask(nil)
                 } label: {
                     ZStack {
                         Circle()
-                            .fill(StructuredTheme.coral)
+                            .fill(accentColor)
                             .frame(width: 54, height: 54)
-                            .shadow(color: StructuredTheme.coral.opacity(0.40), radius: 8, y: 4)
+                            .shadow(color: accentColor.opacity(0.40), radius: 8, y: 4)
                         Image(systemName: "plus")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundStyle(.white)
@@ -151,7 +182,7 @@ public struct DailyTimelineView: View {
                 .buttonStyle(.plain)
                 .padding(.trailing, 34)
                 .padding(.bottom, 24)
-                .help("Crear nueva tarea")
+                .help(String(localized: "Crear nueva tarea"))
             }
             .onChange(of: timeline.date) { _, newDate in
                 currentTime = newDate
@@ -159,21 +190,23 @@ public struct DailyTimelineView: View {
             .popover(item: $selectedItemForPopover) { item in
                 ScheduledItemDetailPopover(
                     item: item,
-                    subtaskNotes: nil,
-                    taskNotes: nil,
+                    subtaskNotes: item.subtaskNotes,
+                    taskNotes: item.taskNotes,
                     onToggle: {
                         onToggleItem(item)
                         selectedItemForPopover = nil
                     },
                     onEdit: {
+                        let target = item
                         selectedItemForPopover = nil
+                        onEditItem(target)
                     }
                 )
             }
         }
     }
 
-    // MARK: - Vista Previa Colapsada (Vídeo 00:01 y 00:35)
+    // MARK: - Vista Previa Colapsada
     @ViewBuilder
     private var collapsedPreviewContent: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -191,24 +224,25 @@ public struct DailyTimelineView: View {
     }
 
     private var morningRoutineRow: some View {
-        HStack(alignment: .center, spacing: 18) {
-            Text("6:15")
+        let wakeStr = WorkSlot.formatTime(minute: wakeUpMinute)
+        return HStack(alignment: .center, spacing: 18) {
+            Text(wakeStr)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
                 .frame(width: 44, alignment: .trailing)
 
             ZStack {
                 Circle()
-                    .fill(StructuredTheme.coralLight)
+                    .fill(accentLightColor)
                     .frame(width: 44, height: 44)
                 Image(systemName: "alarm.fill")
                     .font(.system(size: 18))
-                    .foregroundStyle(StructuredTheme.coral)
+                    .foregroundStyle(accentColor)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text("6:15 AM")
+                    Text(wakeStr)
                         .font(.system(size: 11, design: .rounded))
                         .foregroundStyle(.secondary)
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -223,7 +257,7 @@ public struct DailyTimelineView: View {
             Spacer()
 
             Circle()
-                .stroke(StructuredTheme.coral, lineWidth: 2)
+                .stroke(accentColor, lineWidth: 2)
                 .frame(width: 20, height: 20)
         }
     }
@@ -232,7 +266,7 @@ public struct DailyTimelineView: View {
     private var timelineTasksFlow: some View {
         let items = dayItems
         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-            let prevEndMinute = index == 0 ? 375 : items[index - 1].endMinute
+            let prevEndMinute = index == 0 ? wakeUpMinute : items[index - 1].endMinute
             let gapMinutes = item.startMinute - prevEndMinute
 
             VStack(alignment: .leading, spacing: 0) {
@@ -246,9 +280,33 @@ public struct DailyTimelineView: View {
                     )
                 }
 
+                // Indicador "Ahora" si la hora actual cae justo antes de esta tarea
+                if isViewingToday && currentMinuteOfDay >= prevEndMinute && currentMinuteOfDay < item.startMinute {
+                    liveNowLineIndicator
+                }
+
                 taskRow(item: item)
             }
         }
+    }
+
+    private var liveNowLineIndicator: some View {
+        HStack(spacing: 12) {
+            Text(WorkSlot.formatTime(minute: currentMinuteOfDay))
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .foregroundStyle(accentColor)
+                .frame(width: 44, alignment: .trailing)
+
+            Circle()
+                .fill(accentColor)
+                .frame(width: 8, height: 8)
+                .frame(width: 44)
+
+            Rectangle()
+                .fill(accentColor.opacity(0.45))
+                .frame(height: 1.5)
+        }
+        .padding(.vertical, 4)
     }
 
     private var overlapWarningSection: some View {
@@ -262,7 +320,7 @@ public struct DailyTimelineView: View {
             .stroke(Color.red, style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [3, 3]))
             .frame(width: 44, height: 20)
 
-            Text("Tasks are overlapping")
+            Text(String(localized: "Tasks are overlapping"))
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.red)
 
@@ -278,84 +336,169 @@ public struct DailyTimelineView: View {
             currentMinuteOfDay < item.endMinute &&
             !item.isCompleted
         let durationMins = max(15, item.endMinute - item.startMinute)
+        let elapsedRatio: CGFloat = isCurrent
+            ? max(0.08, min(1.0, CGFloat(currentMinuteOfDay - item.startMinute) / CGFloat(durationMins)))
+            : 1.0
+        let remainingMins = max(1, item.endMinute - currentMinuteOfDay)
+        let itemColor = StructuredTheme.color(forToken: item.colorToken)
+        let itemLight = StructuredTheme.lightColor(forToken: item.colorToken)
+
         let capsuleHeight: CGFloat = isCompactPreview
             ? 44
             : max(44, min(86, CGFloat(durationMins) * 1.1))
 
-        HStack(alignment: .center, spacing: 18) {
-            VStack(alignment: .trailing, spacing: capsuleHeight > 54 ? 16 : 2) {
-                Text(WorkSlot.formatTime(minute: item.startMinute))
-                    .font(.system(size: 11, weight: isCurrent ? .heavy : .semibold, design: .rounded))
-                    .foregroundStyle(isCurrent ? StructuredTheme.coral : .secondary)
-                Text(WorkSlot.formatTime(minute: item.endMinute))
-                    .font(.system(size: 11, design: .rounded))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(width: 44, alignment: .trailing)
-
-            Button {
-                selectedItemForPopover = item
-            } label: {
-                ZStack {
-                    Capsule()
-                        .fill(item.isCompleted ? StructuredTheme.mint : (isCompactPreview ? StructuredTheme.coralLight : StructuredTheme.coral))
-                        .frame(width: 44, height: capsuleHeight)
-
-                    Image(systemName: item.iconName)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(item.isCompleted ? .white : (isCompactPreview ? StructuredTheme.coral : .white))
-                }
-            }
-            .buttonStyle(.plain)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text("\(WorkSlot.formatTime(minute: item.startMinute))–\(WorkSlot.formatTime(minute: item.endMinute)) (\(formatDuration(item.allocatedHours)))")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 18) {
+                VStack(alignment: .trailing, spacing: capsuleHeight > 54 ? 16 : 2) {
+                    Text(WorkSlot.formatTime(minute: item.startMinute))
+                        .font(.system(size: 11, weight: isCurrent ? .heavy : .semibold, design: .rounded))
+                        .foregroundStyle(isCurrent ? itemColor : .secondary)
+                    Text(WorkSlot.formatTime(minute: item.endMinute))
                         .font(.system(size: 11, design: .rounded))
                         .foregroundStyle(.secondary)
+                }
+                .frame(width: 44, alignment: .trailing)
 
-                    if let sub = item.subtaskTitle, !sub.isEmpty {
-                        Text(sub)
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(StructuredTheme.coralLight)
-                            .foregroundStyle(StructuredTheme.coral)
-                            .clipShape(Capsule())
+                Button {
+                    selectedItemForPopover = item
+                } label: {
+                    ZStack(alignment: .top) {
+                        Capsule()
+                            .fill(item.isCompleted ? StructuredTheme.mint : (isCompactPreview || isCurrent ? itemLight : itemColor))
+                            .frame(width: 44, height: capsuleHeight)
+
+                        if isCurrent {
+                            Capsule()
+                                .fill(itemColor)
+                                .frame(width: 44, height: capsuleHeight * elapsedRatio)
+                            Capsule()
+                                .stroke(itemColor, lineWidth: 2)
+                                .frame(width: 44, height: capsuleHeight)
+                        }
+
+                        Image(systemName: item.iconName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(item.isCompleted ? .white : (isCompactPreview ? itemColor : .white))
+                            .frame(width: 44, height: capsuleHeight)
                     }
                 }
+                .buttonStyle(.plain)
 
-                Text(item.taskTitle)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(item.isCompleted ? .secondary : .primary)
-                    .strikethrough(item.isCompleted, color: .secondary)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("\(WorkSlot.formatTime(minute: item.startMinute))–\(WorkSlot.formatTime(minute: item.endMinute)) (\(formatDuration(item.allocatedHours)))")
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(.secondary)
+
+                        if isCurrent {
+                            Text(String(localized: "Quedan \(remainingMins)m"))
+                                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(itemColor)
+                                .foregroundStyle(.white)
+                                .clipShape(Capsule())
+                        }
+
+                        if !item.subtaskItems.isEmpty {
+                            Button {
+                                toggleSubtaskExpand(item.id)
+                            } label: {
+                                let doneCount = item.subtaskItems.filter(\.isCompleted).count
+                                HStack(spacing: 3) {
+                                    Image(systemName: "checklist")
+                                        .font(.system(size: 8, weight: .bold))
+                                    Text("\(doneCount)/\(item.subtaskItems.count)")
+                                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    Image(systemName: expandedSubtaskItemIds.contains(item.id) ? "chevron.up" : "chevron.down")
+                                        .font(.system(size: 7, weight: .bold))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(itemLight)
+                                .foregroundStyle(itemColor)
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        } else if let sub = item.subtaskTitle, !sub.isEmpty {
+                            Text(sub)
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(itemLight)
+                                .foregroundStyle(itemColor)
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(item.taskTitle)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(item.isCompleted ? .secondary : .primary)
+                        .strikethrough(item.isCompleted, color: .secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                if !item.isExternalCalendarEvent {
+                    Button {
+                        onToggleItem(item)
+                    } label: {
+                        ZStack {
+                            if item.isCompleted {
+                                Circle()
+                                    .fill(StructuredTheme.mint)
+                                    .frame(width: 22, height: 22)
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .heavy))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Circle()
+                                    .stroke(itemColor, lineWidth: 2)
+                                    .frame(width: 20, height: 20)
+                            }
+                        }
+                        .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
-            Spacer()
-
-            Button {
-                onToggleItem(item)
-            } label: {
-                ZStack {
-                    if item.isCompleted {
-                        Circle()
-                            .fill(StructuredTheme.mint)
-                            .frame(width: 22, height: 22)
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .heavy))
-                            .foregroundStyle(.white)
-                    } else {
-                        Circle()
-                            .stroke(StructuredTheme.coral, lineWidth: 2)
-                            .frame(width: 20, height: 20)
+            // Checklist interactivo de subtareas directamente en el Timeline
+            if !isCompactPreview && !item.subtaskItems.isEmpty && expandedSubtaskItemIds.contains(item.id) {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(item.subtaskItems) { sub in
+                        Button {
+                            onToggleSubtask(sub.id)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: sub.isCompleted ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(sub.isCompleted ? StructuredTheme.mint : itemColor)
+                                Text(sub.title)
+                                    .font(.system(size: 12, design: .rounded))
+                                    .strikethrough(sub.isCompleted, color: .secondary)
+                                    .foregroundStyle(sub.isCompleted ? .secondary : .primary)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .frame(width: 28, height: 28)
+                .padding(.leading, 124)
+                .padding(.vertical, 4)
             }
-            .buttonStyle(.plain)
         }
         .padding(.vertical, 2)
+    }
+
+    private func toggleSubtaskExpand(_ id: UUID) {
+        if expandedSubtaskItemIds.contains(id) {
+            expandedSubtaskItemIds.remove(id)
+        } else {
+            expandedSubtaskItemIds.insert(id)
+        }
     }
 
     @ViewBuilder
@@ -369,7 +512,7 @@ public struct DailyTimelineView: View {
                     path.addLine(to: CGPoint(x: 22, y: 48))
                 }
                 .stroke(
-                    StructuredTheme.coral.opacity(0.45),
+                    accentColor.opacity(0.45),
                     style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4])
                 )
                 .frame(width: 44, height: 48)
@@ -384,7 +527,7 @@ public struct DailyTimelineView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if gapMinutes >= 60 {
+                    if gapMinutes >= 45 {
                         Button {
                             onAddNewTask(startMinute)
                         } label: {
@@ -396,8 +539,8 @@ public struct DailyTimelineView: View {
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(StructuredTheme.coralLight)
-                            .foregroundStyle(StructuredTheme.coral)
+                            .background(accentLightColor)
+                            .foregroundStyle(accentColor)
                             .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -407,6 +550,13 @@ public struct DailyTimelineView: View {
                 Spacer()
             }
             .padding(.vertical, 2)
+            .dropDestination(for: String.self) { droppedIds, _ in
+                if let firstId = droppedIds.first {
+                    onDropInboxTask(firstId, startMinute)
+                    return true
+                }
+                return false
+            }
         }
     }
 
@@ -419,7 +569,7 @@ public struct DailyTimelineView: View {
                 path.addLine(to: CGPoint(x: 22, y: 80))
             }
             .stroke(
-                StructuredTheme.coral.opacity(0.45),
+                accentColor.opacity(0.45),
                 style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [4, 4])
             )
             .frame(width: 44, height: 80)
@@ -430,7 +580,7 @@ public struct DailyTimelineView: View {
                     .foregroundStyle(.secondary)
 
                 Button {
-                    onAddNewTask(600)
+                    onAddNewTask(max(wakeUpMinute + 60, 540))
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus.circle.fill")
@@ -439,8 +589,8 @@ public struct DailyTimelineView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(StructuredTheme.coralLight)
-                    .foregroundStyle(StructuredTheme.coral)
+                    .background(accentLightColor)
+                    .foregroundStyle(accentColor)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -451,12 +601,14 @@ public struct DailyTimelineView: View {
     }
 
     private var eveningRoutineRow: some View {
-        HStack(alignment: .center, spacing: 18) {
+        let startStr = WorkSlot.formatTime(minute: windDownMinute)
+        let endStr = WorkSlot.formatTime(minute: min(1439, windDownMinute + 60))
+        return HStack(alignment: .center, spacing: 18) {
             VStack(alignment: .trailing, spacing: 10) {
-                Text("9:45")
+                Text(startStr)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
-                Text("10:45")
+                Text(endStr)
                     .font(.system(size: 11, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -473,7 +625,7 @@ public struct DailyTimelineView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text("9:45–10:45 PM (1 hr)")
+                    Text("\(startStr)–\(endStr) (1 hr)")
                         .font(.system(size: 11, design: .rounded))
                         .foregroundStyle(.secondary)
                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -497,9 +649,9 @@ public struct DailyTimelineView: View {
         let hours = minutes / 60
         let mins = minutes % 60
         if hours > 0 {
-            return "Use \(hours)h \(mins)m, task approaching."
+            return String(localized: "Use \(hours)h \(mins)m, task approaching.")
         } else {
-            return "A well-spent \(mins)m interval."
+            return String(localized: "A well-spent \(mins)m interval.")
         }
     }
 

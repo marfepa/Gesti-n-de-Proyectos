@@ -12,7 +12,7 @@ public struct ContentView: View {
 
     public var body: some View {
         HSplitView {
-            // Panel Izquierdo: Inbox ("Your Unstructured Thoughts") con soporte de Drag & Drop
+            // Panel Izquierdo: Navegación + Inbox ("Your Unstructured Thoughts") con soporte de Drag & Drop
             StructuredInboxSidebarView(
                 viewModel: viewModel,
                 onNewInboxTask: {
@@ -20,7 +20,7 @@ public struct ContentView: View {
                 }
             )
 
-            // Panel Derecho: Timeline Principal, Planificador o Diagrama de Gantt
+            // Panel Derecho: Timeline Principal, Planificador, Bandeja o Diagrama de Gantt
             Group {
                 switch viewModel.activeTab {
                 case .todayTimeline:
@@ -50,6 +50,7 @@ public struct ContentView: View {
                 initialDate: Date(),
                 initialStartMinute: 600,
                 isInboxMode: true,
+                projects: projects,
                 onSave: { draft in
                     saveNewInboxTask(from: draft)
                 },
@@ -61,6 +62,11 @@ public struct ContentView: View {
         .sheet(isPresented: $viewModel.showingNewProjectSheet) {
             ProjectInputView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.showingEditProjectSheet) {
+            if let proj = viewModel.projectToEdit {
+                ProjectEditSheet(project: proj, viewModel: viewModel)
+            }
+        }
         .onAppear {
             if viewModel.selectedProject == nil, let first = projects.first {
                 viewModel.selectedProject = first
@@ -70,13 +76,16 @@ public struct ContentView: View {
 
     private func saveNewInboxTask(from draft: StructuredTaskDraft) {
         let targetProject: Project
-        if let first = projects.first {
+        if let pid = draft.projectId, let found = projects.first(where: { $0.id == pid }) {
+            targetProject = found
+        } else if let first = projects.first {
             targetProject = first
         } else {
             let newProject = Project(
                 name: "Inbox & Mi Día",
                 projectDescription: "Tareas rápidas y pensamientos sin estructurar",
-                priority: .media
+                priority: .media,
+                colorToken: draft.colorToken
             )
             modelContext.insert(newProject)
             targetProject = newProject
@@ -96,6 +105,8 @@ public struct ContentView: View {
             isInbox: true,
             hasFixedTime: false,
             iconName: draft.iconName,
+            colorToken: draft.colorToken,
+            alertOffsetMinutes: draft.alertOffsetMinutes,
             project: targetProject
         )
         modelContext.insert(newTask)
@@ -103,4 +114,3 @@ public struct ContentView: View {
         try? modelContext.save()
     }
 }
-
